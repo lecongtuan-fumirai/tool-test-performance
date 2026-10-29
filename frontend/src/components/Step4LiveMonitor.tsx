@@ -217,6 +217,20 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
           />
         </div>
 
+        {k8s?.oomKilledDetected && (
+          <div className="p-4 rounded-xl bg-rose-950/80 border-2 border-rose-500 text-rose-200 text-xs flex items-center gap-3 animate-pulse shadow-lg shadow-rose-950/50">
+            <AlertTriangle className="w-6 h-6 text-rose-400 shrink-0" />
+            <div>
+              <div className="font-bold text-sm text-rose-100 uppercase tracking-wide">
+                🚨 SỰ KIỆN KUBERNETES: OOMKilled (Exit Code 137)
+              </div>
+              <div className="mt-0.5 text-rose-300">
+                Pod ứng dụng đã bị hệ điều hành tiêu diệt hoàn toàn do vượt quá giới hạn RAM cho phép ({k8s.memoryLimitMi ? `${k8s.memoryLimitMi} MiB` : 'Memory Limit'}). Hệ thống đã chính thức sụp đổ (Breaking Point)!
+              </div>
+            </div>
+          </div>
+        )}
+
         {currentRun.safetyBreaker.tripped && (
           <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center gap-3 text-amber-200 text-xs">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />

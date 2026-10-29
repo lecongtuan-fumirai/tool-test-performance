@@ -26,25 +26,30 @@ function computePercentile(sorted: number[], p: number): number {
 }
 
 /**
- * Generates a realistic structured JSON batch payload of the specified KB size for Volume Testing.
+ * Generates a realistic structured JSON batch payload of the specified KB size for Volume & OOM Testing.
  */
 function buildVolumePayload(sizeKb: number): string {
-  const clampedKb = Math.max(1, Math.min(1024, sizeKb));
+  const clampedKb = Math.max(1, Math.min(4096, sizeKb));
   const targetBytes = clampedKb * 1024;
-  const records: Array<{ id: number; ts: string; metric: string; payload: string }> = [];
-  const chunk = 'VOL_DATA_RECORD_0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ_'.repeat(4);
+  const records: Array<{ id: number; ts: string; metric: string; dataBlock: string; metadata: any }> = [];
+  const chunk = 'VOL_PAYLOAD_OOM_INJECTION_DATA_CHUNK_0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ_'.repeat(6);
   let i = 0;
   while (JSON.stringify(records).length < targetBytes) {
     records.push({
       id: ++i,
       ts: new Date().toISOString(),
-      metric: `batch-record-${i}`,
-      payload: chunk,
+      metric: `heavy-oom-record-${i}`,
+      dataBlock: chunk,
+      metadata: {
+        expandedLength: chunk.length,
+        nestedBuffer: chunk.slice(0, 100),
+      },
     });
-    if (i > 2500) break;
+    if (i > 8000) break;
   }
   return JSON.stringify({
-    volumeTestBatch: true,
+    oomInjectionBatch: true,
+    targetPayloadKb: clampedKb,
     recordCount: records.length,
     records,
   });
@@ -896,6 +901,31 @@ export class RealRunnerEngine {
         }
       } catch {}
 
+      let oomKilledDetected = false;
+      for (const p of podsToInspect) {
+        const statuses = p.status?.containerStatuses || [];
+        for (const cs of statuses) {
+          if (
+            cs.lastState?.terminated?.reason === 'OOMKilled' ||
+            cs.lastState?.terminated?.exitCode === 137 ||
+            cs.state?.terminated?.reason === 'OOMKilled' ||
+            cs.state?.terminated?.exitCode === 137
+          ) {
+            oomKilledDetected = true;
+            break;
+          }
+        }
+        if (oomKilledDetected) break;
+      }
+
+      if (
+        recentEvent.toLowerCase().includes('oom') ||
+        recentEvent.toLowerCase().includes('killing') ||
+        recentEvent.toLowerCase().includes('evicted')
+      ) {
+        oomKilledDetected = true;
+      }
+
       let recentLogLine = '';
       try {
         const logRes = await coreApi.readNamespacedPodLog(
@@ -929,6 +959,7 @@ export class RealRunnerEngine {
         memoryLimitMi,
         memoryUsagePercent,
         restartCount,
+        oomKilledDetected,
         recentEvent,
         recentLogLine,
       };
@@ -943,6 +974,7 @@ export class RealRunnerEngine {
         memoryLimitMi,
         memoryUsagePercent: null,
         restartCount: 0,
+        oomKilledDetected: false,
         recentEvent: err instanceof Error ? err.message : 'K8s API Error',
         recentLogLine: '',
       };
@@ -1242,7 +1274,12 @@ export class RealRunnerEngine {
     const recs: string[] = [];
     let grade: TestRunRecord['evaluation']['grade'] = 'A+';
 
-    if (run.safetyBreaker.tripped) {
+    if (run.latestTick.internal.oomKilledDetected) {
+      grade = 'F';
+      recs.unshift(
+        '🚨 SỰ KIỆN KUBERNETES OOMKilled: Pod đã bị K8s tiêu diệt hoàn toàn do vượt quá giới hạn bộ nhớ RAM (Exit Code 137). Cần tăng memory limit hoặc tối ưu xử lý payload lớn / stream JSON.'
+      );
+    } else if (run.safetyBreaker.tripped) {
       grade = 'C';
       recs.push(
         `Bộ nhớ thực tế của Pod đã chạm ngưỡng bảo vệ ${run.safetyBreaker.thresholdPercent}% (${run.safetyBreaker.thresholdMemoryMi} MiB). Khuyến nghị nâng resources.limits.memory hoặc tăng số lượng replicas.`
@@ -1330,12 +1367,16 @@ export class RealRunnerEngine {
 
     return {
       grade,
-      headlineVi: run.safetyBreaker.tripped
+      headlineVi: run.latestTick.internal.oomKilledDetected
+        ? `🚨 SỰ KIỆN KUBERNETES OOMKilled (Exit Code 137): Pod đã bị tiêu diệt do cạn kiệt bộ nhớ RAM!`
+        : run.safetyBreaker.tripped
         ? `⚡ Đã ngắt an toàn bởi Cầu chì Tự động khi RAM chạm ${run.latestTick.internal.totalMemoryMi} MiB`
         : customStopNote ||
           `Hoàn tất [${run.testType || 'LOAD_TEST'}] trên ${run.targetUrl}: Tổng ${totalReq} yêu cầu, Độ trễ p95 cao nhất ${maxP95}ms, RAM Pod ${lastMemStr}`,
-      nonTechSummaryVi: `Trong phiên kiểm thử [${run.testType || 'LOAD_TEST'}] (từ ${run.virtualUsers} đến ${run.peakVirtualUsers || run.virtualUsers} người dùng đồng thời) vào ${run.targetUrl}, máy chủ đã xử lý thành công ${total2xx}/${totalReq} yêu cầu (chặn quá tải 429: ${total429}, lỗi: ${total5xx}). Độ trễ phản hồi thực tế (p95) là ${maxP95}ms và mức tiêu thụ RAM của máy chủ trên K8s là ${lastMemStr}.`,
-      engineerSummary: `Type=${run.testType || 'LOAD_TEST'} | Target=${run.targetUrl} | TotalReq=${totalReq} (2xx=${total2xx}, 429=${total429}, 5xx/Err=${total5xx}) | Max_p95=${maxP95}ms | Pod_RAM=${lastMemStr}`,
+      nonTechSummaryVi: run.latestTick.internal.oomKilledDetected
+        ? `CẢNH BÁO ĐỎ: Pod ứng dụng trên Kubernetes đã bị hệ điều hành tiêu diệt (OOMKilled - Exit Code 137) do tiêu thụ vượt trần RAM (${lastMemStr}). Đã xác nhận điểm sụp đổ hoàn toàn của hệ thống.`
+        : `Trong phiên kiểm thử [${run.testType || 'LOAD_TEST'}] (từ ${run.virtualUsers} đến ${run.peakVirtualUsers || run.virtualUsers} người dùng đồng thời) vào ${run.targetUrl}, máy chủ đã xử lý thành công ${total2xx}/${totalReq} yêu cầu (chặn quá tải 429: ${total429}, lỗi: ${total5xx}). Độ trễ phản hồi thực tế (p95) là ${maxP95}ms và mức tiêu thụ RAM của máy chủ trên K8s là ${lastMemStr}.`,
+      engineerSummary: `Type=${run.testType || 'LOAD_TEST'} | Target=${run.targetUrl} | TotalReq=${totalReq} (2xx=${total2xx}, 429=${total429}, 5xx/Err=${total5xx}) | Max_p95=${maxP95}ms | Pod_RAM=${lastMemStr} | OOMKilled=${Boolean(run.latestTick.internal.oomKilledDetected)}`,
       recommendationsVi: recs,
     };
   }

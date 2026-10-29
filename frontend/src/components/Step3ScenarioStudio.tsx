@@ -829,14 +829,14 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
                 <input
                   type="range"
                   min={8}
-                  max={512}
-                  step={8}
+                  max={2048}
+                  step={32}
                   value={volumePayloadKb}
                   onChange={(e) => setVolumePayloadKb(Number(e.target.value))}
                   className="w-full accent-purple-400"
                 />
                 <span className="text-[10px] text-slate-400">
-                  Tự sinh lô bản ghi JSON lớn để kiểm tra băng thông & DB
+                  Tự sinh lô bản ghi JSON lớn (lên tới 2048 KB) để kiểm tra bộ nhớ V8 & crash OOM
                 </span>
               </div>
             )}

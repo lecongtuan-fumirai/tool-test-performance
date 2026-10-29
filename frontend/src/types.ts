@@ -161,6 +161,7 @@ export interface LiveRunTick {
     memoryLimitMi: number | null;
     memoryUsagePercent: number | null;
     restartCount: number;
+    oomKilledDetected?: boolean;
     recentEvent: string;
     recentLogLine: string;
   };
