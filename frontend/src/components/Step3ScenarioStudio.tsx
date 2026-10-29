@@ -41,67 +41,119 @@ interface Step3ScenarioStudioProps {
 
 const TEST_TYPE_CATALOG: Array<{
   type: PerformanceTestType;
+  group: 'PERFORMANCE' | 'SECURITY';
+  automation?: 'Có' | 'Một phần';
   title: string;
   purpose: string;
   example: string;
   badgeColor: string;
   icon: React.ReactNode;
 }> = [
+  // === 6 PERFORMANCE TESTING TYPES ===
   {
     type: 'LOAD_TEST',
+    group: 'PERFORMANCE',
     title: '1. Load Testing',
     purpose: 'Kiểm tra hệ thống với tải dự kiến',
-    example: 'VD: 50 – 1.000 users truy cập ổn định cùng lúc',
+    example: 'VD: 1.000 users truy cập cùng lúc',
     badgeColor: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300',
     icon: <Activity className="w-4 h-4 text-cyan-400" />,
   },
   {
     type: 'STRESS_TEST',
+    group: 'PERFORMANCE',
     title: '2. Stress Testing',
     purpose: 'Tăng tải vượt giới hạn để tìm điểm gãy',
-    example: 'VD: Tăng bậc thang liên tục để tìm Breaking Point',
+    example: 'VD: Tăng bậc thang từ 1.000 lên 10.000 users',
     badgeColor: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
     icon: <Flame className="w-4 h-4 text-rose-400" />,
   },
   {
     type: 'SPIKE_TEST',
+    group: 'PERFORMANCE',
     title: '3. Spike Testing',
     purpose: 'Kiểm tra khi tải tăng hoặc giảm đột ngột',
-    example: 'VD: Traffic tăng vọt gấp 10 lần trong thời gian ngắn',
+    example: 'VD: Traffic tăng 10 lần trong 1 phút',
     badgeColor: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
     icon: <Zap className="w-4 h-4 text-amber-400" />,
   },
   {
     type: 'SOAK_ENDURANCE_TEST',
+    group: 'PERFORMANCE',
     title: '4. Endurance / Soak Testing',
     purpose: 'Kiểm tra hệ thống khi chịu tải lâu dài',
-    example: 'VD: Chạy liên tục dài hạn để dò Memory Leak (Rò rỉ RAM)',
+    example: 'VD: 500 users chạy liên tục nhiều giờ (Dò Memory Leak)',
     badgeColor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
     icon: <Clock className="w-4 h-4 text-emerald-400" />,
   },
   {
     type: 'SCALABILITY_TEST',
+    group: 'PERFORMANCE',
     title: '5. Scalability Testing',
     purpose: 'Kiểm tra khả năng mở rộng khi tăng tài nguyên',
-    example: 'VD: Đo RPS/Pod khi mở rộng số Pod từ 2 lên 10',
+    example: 'VD: Tăng số Pod từ 2 lên 10 & đo RPS/Pod',
     badgeColor: 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300',
     icon: <TrendingUp className="w-4 h-4 text-indigo-400" />,
   },
   {
     type: 'VOLUME_TEST',
+    group: 'PERFORMANCE',
     title: '6. Volume Testing',
     purpose: 'Kiểm tra khi dữ liệu có khối lượng lớn',
-    example: 'VD: Bắn Payload lớn (64KB–512KB) / Truy vấn bản ghi lớn',
+    example: 'VD: Payload lớn (64KB–512KB) / Truy vấn bản ghi lớn',
     badgeColor: 'border-purple-500/40 bg-purple-500/10 text-purple-300',
     icon: <Database className="w-4 h-4 text-purple-400" />,
   },
+  // === 5 SECURITY TESTING TYPES ===
   {
-    type: 'SECURITY_AUDIT',
-    title: '7. Security Audit',
-    purpose: 'Kiểm toán bảo mật cửa ngõ & K8s Manifest',
-    example: 'VD: Kiểm tra Security Headers, CORS, NetworkPolicy, Pod Root',
+    type: 'SECURITY_DAST',
+    group: 'SECURITY',
+    automation: 'Có',
+    title: '7. DAST (Dynamic App Security)',
+    purpose: 'Phát hiện một số lỗ hổng web khi chạy',
+    example: 'Tự động: Có • Quét XSS/SQLi reflection, Security Headers',
     badgeColor: 'border-teal-500/40 bg-teal-500/10 text-teal-300',
     icon: <ShieldCheck className="w-4 h-4 text-teal-400" />,
+  },
+  {
+    type: 'SECURITY_API',
+    group: 'SECURITY',
+    automation: 'Một phần',
+    title: '8. API Security',
+    purpose: 'Kiểm tra input, quyền và hành vi API',
+    example: 'Tự động: Một phần • Kiểm tra Malformed JSON, CORS, Rate Limit',
+    badgeColor: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
+    icon: <ShieldCheck className="w-4 h-4 text-sky-400" />,
+  },
+  {
+    type: 'SECURITY_AUTH',
+    group: 'SECURITY',
+    automation: 'Một phần',
+    title: '9. Authentication / Authorization',
+    purpose: 'Xác minh các vai trò và quyền truy cập',
+    example: 'Tự động: Một phần • Thử Token giả mạo (alg:none), kiểm tra RBAC/BOLA',
+    badgeColor: 'border-violet-500/40 bg-violet-500/10 text-violet-300',
+    icon: <ShieldAlert className="w-4 h-4 text-violet-400" />,
+  },
+  {
+    type: 'SECURITY_INFRA',
+    group: 'SECURITY',
+    automation: 'Có',
+    title: '10. Infrastructure Scan',
+    purpose: 'Phát hiện cấu hình không an toàn',
+    example: 'Tự động: Có • Kiểm toán K8s NetworkPolicy, Pod SecurityContext, TLS',
+    badgeColor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+    icon: <ShieldCheck className="w-4 h-4 text-emerald-400" />,
+  },
+  {
+    type: 'SECURITY_PENTEST',
+    group: 'SECURITY',
+    automation: 'Một phần',
+    title: '11. Pentest (Exploit Chain)',
+    purpose: 'Phát hiện chuỗi khai thác và lỗi logic phức tạp',
+    example: 'Tự động: Một phần • Mô phỏng chuỗi Recon -> Path Traversal & Log Pod',
+    badgeColor: 'border-orange-500/40 bg-orange-500/10 text-orange-300',
+    icon: <ShieldAlert className="w-4 h-4 text-orange-400" />,
   },
 ];
 
@@ -208,10 +260,15 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
       setDescription(`${meta.purpose} — ${meta.example}`);
     }
 
-    if (selectedType === 'SECURITY_AUDIT') {
+    if (selectedType.startsWith('SECURITY_')) {
       setProtocol('SECURITY_AUDIT');
-      setVirtualUsers(5);
-      setDurationSeconds(10);
+      setVirtualUsers(selectedType === 'SECURITY_PENTEST' ? 10 : 5);
+      setDurationSeconds(selectedType === 'SECURITY_PENTEST' ? 15 : 10);
+      if (selectedType === 'SECURITY_API') {
+        setMethod('POST');
+      } else {
+        setMethod('GET');
+      }
     } else {
       if (protocol === 'SECURITY_AUDIT') setProtocol('HTTP');
       if (selectedType === 'LOAD_TEST') {
@@ -327,9 +384,9 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               type="button"
               onClick={onAutoGenerateScenarios}
               className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 flex items-center gap-1"
-              title="Tự động tạo đủ 6 loại Performance Test + Security Audit từ hạ tầng K8s"
+              title="Tự động tạo đủ 6 loại Performance Test + 5 loại Security Test từ hạ tầng K8s"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Sinh đủ 7 loại Test
+              <Sparkles className="w-3.5 h-3.5" /> Sinh đủ 11 loại Test
             </button>
             <button
               type="button"
@@ -456,41 +513,92 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
           </div>
         </div>
 
-        {/* 6 PERFORMANCE TEST TYPES + SECURITY AUDIT SELECTOR GRID */}
-        <div className="space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-            1. Chọn Loại Kiểm thử (6 Loại Performance Testing Chuẩn & Bảo mật)
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {TEST_TYPE_CATALOG.map((item) => {
-              const isSelected = testType === item.type;
-              return (
-                <button
-                  key={item.type}
-                  type="button"
-                  onClick={() => handleSelectTestTypePreset(item.type)}
-                  className={`text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1.5 ${
-                    isSelected
-                      ? 'border-cyan-400 bg-cyan-950/35 shadow-sm'
-                      : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      {item.icon}
-                      {item.title}
-                    </span>
-                    {isSelected && (
-                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-300 font-medium leading-snug">
-                    {item.purpose}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-mono">{item.example}</p>
-                </button>
-              );
-            })}
+        {/* 6 PERFORMANCE TEST TYPES + 5 SECURITY TEST TYPES SELECTOR GRID */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-cyan-300">
+              1A. Nhóm Kiểm thử Hiệu năng & Chịu tải (6 Loại Performance Testing Chuẩn)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {TEST_TYPE_CATALOG.filter((item) => item.group === 'PERFORMANCE').map(
+                (item) => {
+                  const isSelected = testType === item.type;
+                  return (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => handleSelectTestTypePreset(item.type)}
+                      className={`text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1.5 ${
+                        isSelected
+                          ? 'border-cyan-400 bg-cyan-950/35 shadow-sm'
+                          : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          {item.icon}
+                          {item.title}
+                        </span>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-medium leading-snug">
+                        {item.purpose}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono">{item.example}</p>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-emerald-300">
+              1B. Nhóm Kiểm thử Bảo mật (5 Loại Security Testing: DAST, API, Auth/RBAC, Infra Scan, Pentest)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {TEST_TYPE_CATALOG.filter((item) => item.group === 'SECURITY').map(
+                (item) => {
+                  const isSelected = testType === item.type;
+                  return (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => handleSelectTestTypePreset(item.type)}
+                      className={`text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1.5 ${
+                        isSelected
+                          ? 'border-emerald-400 bg-emerald-950/35 shadow-sm'
+                          : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          {item.icon}
+                          {item.title}
+                        </span>
+                        {item.automation && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                              item.automation === 'Có'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}
+                          >
+                            Tự động: {item.automation}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-medium leading-snug">
+                        {item.purpose}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono">{item.example}</p>
+                    </button>
+                  );
+                }
+              )}
+            </div>
           </div>
         </div>
 

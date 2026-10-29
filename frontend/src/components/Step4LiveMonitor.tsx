@@ -637,17 +637,24 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                     <div className="space-y-1 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-white">{finding.titleVi}</span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                            finding.status === 'PASS'
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : finding.status === 'WARN'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-rose-500/20 text-rose-300'
-                          }`}
-                        >
-                          {finding.category} • {finding.status}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {finding.automationLevel && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700">
+                              Tự động hóa: {finding.automationLevel}
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                              finding.status === 'PASS'
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : finding.status === 'WARN'
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-rose-500/20 text-rose-300'
+                            }`}
+                          >
+                            {finding.category} • {finding.status}
+                          </span>
+                        </div>
                       </div>
                       <p className="text-xs font-mono text-slate-400">
                         {finding.technicalCheck} → {finding.observedResult}

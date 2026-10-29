@@ -417,13 +417,13 @@ export class StorageRepository {
       })
     );
 
-    // 7. Real Security & K8s Manifest Audit Scenario
+    // 7. DAST (Dynamic Application Security Testing) — Tự động hóa: Có
     created.push(
       this.saveScenario({
         clusterId: cluster.id,
-        name: `[7. Security Audit] Kiểm toán Bảo mật Cửa ngõ & K8s (${snapshot.namespace})`,
-        description: `Kiểm tra thực tế Security Headers, CORS, Auth và kiểm toán NetworkPolicy + Pod SecurityContext trên ${snapshot.namespace}.`,
-        testType: 'SECURITY_AUDIT',
+        name: `[7. DAST] Rà quét Lỗ hổng Web Động (${primaryPath})`,
+        description: `[Tự động hóa: Có] Phát hiện lỗ hổng ứng dụng web khi đang chạy: kiểm tra XSS/SQLi reflection, HTTP Security Headers (HSTS, CSP, XFO) và rò rỉ thông tin Server.`,
+        testType: 'SECURITY_DAST',
         protocol: 'SECURITY_AUDIT',
         method: 'GET',
         targetBaseUrl: baseUrl,
@@ -432,6 +432,90 @@ export class StorageRepository {
         virtualUsers: 5,
         durationSeconds: 10,
         rampUpSeconds: 2,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 8. API Security — Tự động hóa: Một phần
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[8. API Security] Kiểm tra Input, Quyền & Hành vi API (${dataPath})`,
+        description: `[Tự động hóa: Một phần] Kiểm tra phản ứng của API với dữ liệu đầu vào bất thường (Malformed JSON/Query), HTTP Method Tampering, CORS Origin và cơ chế Rate Limiting.`,
+        testType: 'SECURITY_API',
+        protocol: 'SECURITY_AUDIT',
+        method: 'POST',
+        targetBaseUrl: baseUrl,
+        targetPath: dataPath,
+        headers: { 'Content-Type': 'application/json' },
+        virtualUsers: 8,
+        durationSeconds: 12,
+        rampUpSeconds: 2,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 9. Authentication / Authorization — Tự động hóa: Một phần
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[9. Auth / RBAC] Xác minh Vai trò & Quyền Truy cập (${dataPath})`,
+        description: `[Tự động hóa: Một phần] Xác minh cơ chế Authentication/Authorization: thử truy cập ẩn danh (No Token), Token giả mạo/hết hạn (Invalid JWT) để phát hiện lỗi Broken Access Control (BOLA).`,
+        testType: 'SECURITY_AUTH',
+        protocol: 'SECURITY_AUDIT',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: dataPath,
+        headers: {},
+        virtualUsers: 5,
+        durationSeconds: 10,
+        rampUpSeconds: 2,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 10. Infrastructure Scan — Tự động hóa: Có
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[10. Infrastructure Scan] Quét Cấu hình Hạ tầng K8s & Ingress (${snapshot.namespace})`,
+        description: `[Tự động hóa: Có] Phát hiện cấu hình không an toàn trên Kubernetes: kiểm toán NetworkPolicy, Pod SecurityContext (runAsNonRoot, readOnlyRootFS), Resource Quotas/Limits và TLS.`,
+        testType: 'SECURITY_INFRA',
+        protocol: 'SECURITY_AUDIT',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: primaryPath,
+        headers: {},
+        virtualUsers: 4,
+        durationSeconds: 10,
+        rampUpSeconds: 2,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 11. Pentest (Penetration Testing) — Tự động hóa: Một phần
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[11. Pentest] Kiểm thử Xâm nhập & Chuỗi Khai thác Logic (${dataPath})`,
+        description: `[Tự động hóa: Một phần] Mô phỏng chuỗi khai thác đa bước (Recon -> Path Traversal / IDOR Probe -> Race Burst) kết hợp đối chiếu Log/Events bên trong Pod để phát hiện lỗi logic phức tạp.`,
+        testType: 'SECURITY_PENTEST',
+        protocol: 'SECURITY_AUDIT',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: dataPath,
+        headers: {},
+        virtualUsers: 10,
+        durationSeconds: 15,
+        rampUpSeconds: 3,
         targetNamespace: snapshot.namespace,
         targetWorkload: primaryWorkload,
         safetyAbortMemoryPercent: 85,

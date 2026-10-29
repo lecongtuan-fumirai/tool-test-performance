@@ -100,6 +100,11 @@ export type PerformanceTestType =
   | 'SOAK_ENDURANCE_TEST'
   | 'SCALABILITY_TEST'
   | 'VOLUME_TEST'
+  | 'SECURITY_DAST'
+  | 'SECURITY_API'
+  | 'SECURITY_AUTH'
+  | 'SECURITY_INFRA'
+  | 'SECURITY_PENTEST'
   | 'SECURITY_AUDIT';
 
 export interface TestScenario {
@@ -161,9 +166,22 @@ export interface LiveRunTick {
   };
 }
 
+export type SecurityDomainCategory =
+  | 'DAST'
+  | 'API_SECURITY'
+  | 'AUTH_RBAC'
+  | 'INFRA_SCAN'
+  | 'PENTEST_CHAIN'
+  | 'EDGE_TLS_HEADERS'
+  | 'AUTH_ACCESS'
+  | 'CORS_ORIGIN'
+  | 'K8S_NETPOL'
+  | 'K8S_POD_SECURITY';
+
 export interface SecurityAuditFinding {
   id: string;
-  category: 'EDGE_TLS_HEADERS' | 'AUTH_ACCESS' | 'CORS_ORIGIN' | 'K8S_NETPOL' | 'K8S_POD_SECURITY';
+  category: SecurityDomainCategory;
+  automationLevel?: 'Có (Tự động 100%)' | 'Một phần (Bán tự động)';
   titleVi: string;
   technicalCheck: string;
   observedResult: string;
