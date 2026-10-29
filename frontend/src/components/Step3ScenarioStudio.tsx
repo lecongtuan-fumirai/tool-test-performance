@@ -384,9 +384,9 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               type="button"
               onClick={onAutoGenerateScenarios}
               className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 flex items-center gap-1"
-              title="Tự động tạo đủ 6 loại Performance Test + 5 loại Security Test từ hạ tầng K8s"
+              title="Tự động tạo đủ 6 loại Performance Test + 5 loại Security Test + OOM Crash Test từ hạ tầng K8s"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Sinh đủ 11 loại Test
+              <Sparkles className="w-3.5 h-3.5" /> Sinh Đủ 12 Kịch Bản (Gồm OOM)
             </button>
             <button
               type="button"
@@ -430,9 +430,16 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-bold text-white leading-snug">
-                      {scen.name}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-white leading-snug">
+                        {scen.name}
+                      </span>
+                      {scen.name.includes('OOM') && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse">
+                          🔥 OOM CRASH
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {

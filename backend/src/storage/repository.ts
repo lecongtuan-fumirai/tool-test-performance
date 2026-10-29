@@ -221,11 +221,13 @@ export class StorageRepository {
   // DYNAMIC SCENARIOS CRUD
   // ============================================================================
   public listScenarios(clusterId?: string): TestScenario[] {
+    this.data = this.loadFromDisk();
     if (!clusterId) return this.data.scenarios;
     return this.data.scenarios.filter((s) => s.clusterId === clusterId);
   }
 
   public getScenario(id: string): TestScenario | undefined {
+    this.data = this.loadFromDisk();
     return this.data.scenarios.find((s) => s.id === id);
   }
 
