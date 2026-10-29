@@ -93,11 +93,21 @@ export interface NamespaceTopologySnapshot {
 
 export type ScenarioProtocol = 'HTTP' | 'WEBSOCKET' | 'SECURITY_AUDIT';
 
+export type PerformanceTestType =
+  | 'LOAD_TEST'
+  | 'STRESS_TEST'
+  | 'SPIKE_TEST'
+  | 'SOAK_ENDURANCE_TEST'
+  | 'SCALABILITY_TEST'
+  | 'VOLUME_TEST'
+  | 'SECURITY_AUDIT';
+
 export interface TestScenario {
   id: string;
   clusterId: string;
   name: string;
   description: string;
+  testType?: PerformanceTestType;
   protocol: ScenarioProtocol;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   targetBaseUrl: string;
@@ -105,6 +115,9 @@ export interface TestScenario {
   headers: Record<string, string>;
   requestBody?: string;
   virtualUsers: number;
+  peakVirtualUsers?: number;
+  volumePayloadKb?: number;
+  targetPodReplicas?: number;
   durationSeconds: number;
   rampUpSeconds: number;
   targetNamespace: string;
@@ -117,10 +130,12 @@ export interface TestScenario {
 export interface LiveRunTick {
   elapsedSeconds: number;
   timestamp: string;
+  stageLabel?: string;
   external: {
     activeWorkers: number;
     requestsPerSec: number;
     totalRequests: number;
+    throughputKbps?: number;
     latencyAvgMs: number;
     latencyP50Ms: number;
     latencyP95Ms: number;
@@ -157,10 +172,22 @@ export interface SecurityAuditFinding {
   remediationVi: string;
 }
 
+export interface SpecializedTestInsights {
+  testType: PerformanceTestType;
+  breakingPointVu?: number | null;
+  spikeRecoverySeconds?: number | null;
+  memoryDriftMi?: number | null;
+  rpsPerPod?: number | null;
+  minPodsObserved?: number;
+  maxPodsObserved?: number;
+  totalVolumeMbProcessed?: number | null;
+}
+
 export interface TestRunRecord {
   id: string;
   scenarioId: string;
   scenarioName: string;
+  testType?: PerformanceTestType;
   clusterId: string;
   clusterName: string;
   namespace: string;
@@ -171,6 +198,7 @@ export interface TestRunRecord {
   startedAt: string;
   finishedAt?: string;
   virtualUsers: number;
+  peakVirtualUsers?: number;
   durationSeconds: number;
   safetyBreaker: {
     armed: boolean;
@@ -183,6 +211,7 @@ export interface TestRunRecord {
   latestTick: LiveRunTick;
   ticks: LiveRunTick[];
   securityFindings: SecurityAuditFinding[];
+  specializedInsights?: SpecializedTestInsights;
   evaluation: {
     grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
     headlineVi: string;

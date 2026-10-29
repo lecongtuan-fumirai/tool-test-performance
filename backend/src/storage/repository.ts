@@ -261,8 +261,8 @@ export class StorageRepository {
   }
 
   /**
-   * Dynamically generates starter scenarios based on REAL discovered Ingresses & Workloads
-   * in a namespace (Zero hardcode!).
+   * Dynamically generates the full 6 Performance Test Types + Security Audit suite
+   * based on REAL discovered Ingresses & Workloads in a namespace (Zero hardcode!).
    */
   public generateScenariosFromTopology(
     cluster: ClusterConnection,
@@ -270,90 +270,164 @@ export class StorageRepository {
   ): TestScenario[] {
     const created: TestScenario[] = [];
     const primaryWorkload = snapshot.workloads[0]?.name || '';
+    const currentReplicas = snapshot.workloads[0]?.replicas || 1;
     const firstIngress = snapshot.ingresses[0];
     const baseUrl = firstIngress
       ? `${firstIngress.tlsEnabled ? 'https' : 'http'}://${firstIngress.host}`
       : cluster.externalBaseUrl || 'https://localhost';
 
-    // 1. Create HTTP Load scenario for each discovered HTTP route (up to 2)
-    const httpRoutes = snapshot.ingresses.filter((r) => r.protocol !== 'WSS').slice(0, 2);
-    if (httpRoutes.length === 0) {
-      created.push(
-        this.saveScenario({
-          clusterId: cluster.id,
-          name: `[HTTP Load] Kiểm thử Chịu tải Endpoint (${snapshot.namespace})`,
-          description: `Bắn tải HTTP thực tế vào ${baseUrl} và đối chiếu RAM/CPU của Pod ${primaryWorkload || 'trong namespace'}`,
-          protocol: 'HTTP',
-          method: 'GET',
-          targetBaseUrl: baseUrl,
-          targetPath: '/healthz',
-          headers: {},
-          virtualUsers: 20,
-          durationSeconds: 15,
-          rampUpSeconds: 5,
-          targetNamespace: snapshot.namespace,
-          targetWorkload: primaryWorkload,
-          safetyAbortMemoryPercent: 85,
-        })
-      );
-    } else {
-      for (const route of httpRoutes) {
-        created.push(
-          this.saveScenario({
-            clusterId: cluster.id,
-            name: `[HTTP Load] Kiểm thử Chịu tải ${route.path} (${route.serviceName})`,
-            description: `Bắn tải HTTP GET thực tế vào https://${route.host}${route.path} và giám sát Pod ${primaryWorkload}`,
-            protocol: 'HTTP',
-            method: 'GET',
-            targetBaseUrl: `${route.tlsEnabled ? 'https' : 'http'}://${route.host}`,
-            targetPath: route.path,
-            headers: {},
-            virtualUsers: 25,
-            durationSeconds: 15,
-            rampUpSeconds: 5,
-            targetNamespace: snapshot.namespace,
-            targetWorkload: primaryWorkload,
-            safetyAbortMemoryPercent: 85,
-          })
-        );
-      }
-    }
+    const httpRoutes = snapshot.ingresses.filter((r) => r.protocol !== 'WSS');
+    const primaryPath = httpRoutes[0]?.path || '/healthz';
+    const dataPath =
+      httpRoutes.find((r) => r.path !== '/healthz' && r.path !== '/')?.path || primaryPath;
 
-    // 2. If a WebSocket route exists, create a WebSocket scenario
-    const wsRoute = snapshot.ingresses.find(
-      (r) => r.protocol === 'WSS' || r.path.includes('ws')
-    );
-    if (wsRoute) {
-      created.push(
-        this.saveScenario({
-          clusterId: cluster.id,
-          name: `[WebSocket] Kiểm thử Kết nối Thời gian thực ${wsRoute.path}`,
-          description: `Mở các phiên kết nối WebSocket thực tế tới wss://${wsRoute.host}${wsRoute.path}`,
-          protocol: 'WEBSOCKET',
-          method: 'GET',
-          targetBaseUrl: `${wsRoute.tlsEnabled ? 'wss' : 'ws'}://${wsRoute.host}`,
-          targetPath: wsRoute.path,
-          headers: {},
-          virtualUsers: 15,
-          durationSeconds: 15,
-          rampUpSeconds: 5,
-          targetNamespace: snapshot.namespace,
-          targetWorkload: primaryWorkload,
-          safetyAbortMemoryPercent: 85,
-        })
-      );
-    }
-
-    // 3. Create a Real Security & K8s Manifest Audit Scenario for this namespace
+    // 1. Load Testing — Kiểm tra hệ thống với tải dự kiến
     created.push(
       this.saveScenario({
         clusterId: cluster.id,
-        name: `[Security Audit] Kiểm toán Bảo mật Cửa ngõ & K8s (${snapshot.namespace})`,
-        description: `Kiểm tra thực tế Security Headers, CORS, Auth và kiểm toán NetworkPolicy + Pod SecurityContext trên ${snapshot.namespace}`,
+        name: `[1. Load Testing] Kiểm tra Tải Dự kiến (${primaryPath})`,
+        description: `Kiểm tra hệ thống hoạt động ổn định ở mức tải mục tiêu dự kiến và đối chiếu SLA (p95 Latency, RAM/CPU của Pod ${primaryWorkload || snapshot.namespace}).`,
+        testType: 'LOAD_TEST',
+        protocol: 'HTTP',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: primaryPath,
+        headers: {},
+        virtualUsers: 50,
+        peakVirtualUsers: 50,
+        durationSeconds: 20,
+        rampUpSeconds: 5,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 2. Stress Testing — Tăng tải vượt giới hạn để tìm điểm gãy (Breaking Point)
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[2. Stress Testing] Tìm Điểm Gãy Hạ tầng (${dataPath})`,
+        description: `Tăng tải bậc thang liên tục từ 30 lên 300 Users vượt giới hạn chịu đựng để xác định chính xác Điểm gãy (Breaking Point: ngưỡng bắt đầu báo lỗi 5xx/429 hoặc chạm trần RAM).`,
+        testType: 'STRESS_TEST',
+        protocol: 'HTTP',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: dataPath,
+        headers: {},
+        virtualUsers: 30,
+        peakVirtualUsers: 300,
+        durationSeconds: 30,
+        rampUpSeconds: 5,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 88,
+      })
+    );
+
+    // 3. Spike Testing — Kiểm tra khi tải tăng hoặc giảm đột ngột (Traffic tăng 10 lần)
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[3. Spike Testing] Sốc Tải Đột ngột Gấp 10 Lần (${primaryPath})`,
+        description: `Đang chạy tải nền 20 Users thì tăng vọt đột ngột gấp 10 lần (200 Users) không báo trước, sau đó hạ đột ngột để đo thời gian hệ thống tự phục hồi (Recovery Time).`,
+        testType: 'SPIKE_TEST',
+        protocol: 'HTTP',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: primaryPath,
+        headers: {},
+        virtualUsers: 20,
+        peakVirtualUsers: 200,
+        durationSeconds: 25,
+        rampUpSeconds: 2,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 4. Endurance / Soak Testing — Kiểm tra hệ thống khi chịu tải lâu dài (Phát hiện Memory Leak)
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[4. Endurance / Soak Testing] Chịu tải Dài hạn & Dò Rò rỉ RAM`,
+        description: `Duy trì tải liên tục trong thời gian dài để kiểm tra độ bền (Soak Test), theo dõi độ lệch bộ nhớ (Memory Drift MiB) nhằm phát hiện rò rỉ RAM (Memory Leak) hoặc nghẽn kết nối.`,
+        testType: 'SOAK_ENDURANCE_TEST',
+        protocol: 'HTTP',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: primaryPath,
+        headers: {},
+        virtualUsers: 35,
+        peakVirtualUsers: 35,
+        durationSeconds: 60,
+        rampUpSeconds: 8,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 5. Scalability Testing — Kiểm tra khả năng mở rộng khi tăng tài nguyên / số Pod
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[5. Scalability Testing] Đánh giá Khả năng Mở rộng Pod (${currentReplicas} -> ${Math.max(4, currentReplicas * 3)} Pods)`,
+        description: `Đo lường hiệu năng mở rộng (RPS trên mỗi Pod, độ trễ và mức chia tải CPU/RAM) khi tăng quy mô Pod từ ${currentReplicas} lên ${Math.max(4, currentReplicas * 3)} Replicas.`,
+        testType: 'SCALABILITY_TEST',
+        protocol: 'HTTP',
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: dataPath,
+        headers: {},
+        virtualUsers: 60,
+        peakVirtualUsers: 120,
+        targetPodReplicas: Math.max(4, currentReplicas * 3),
+        durationSeconds: 25,
+        rampUpSeconds: 6,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 6. Volume Testing — Kiểm tra khi dữ liệu có khối lượng lớn (Large Payload / DB Batch)
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[6. Volume Testing] Kiểm thử Khối lượng Dữ liệu Lớn (${dataPath})`,
+        description: `Bắn luồng dữ liệu có dung lượng lớn (Heavy Payload 64KB/request & tham số truy vấn tập bản ghi lớn) để kiểm tra băng thông xử lý, bộ nhớ V8 Heap và tốc độ truy vấn Database.`,
+        testType: 'VOLUME_TEST',
+        protocol: 'HTTP',
+        method: 'POST',
+        targetBaseUrl: baseUrl,
+        targetPath: `${dataPath}${dataPath.includes('?') ? '&' : '?'}limit=5000&volumeTest=true`,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        volumePayloadKb: 64,
+        virtualUsers: 25,
+        peakVirtualUsers: 25,
+        durationSeconds: 20,
+        rampUpSeconds: 4,
+        targetNamespace: snapshot.namespace,
+        targetWorkload: primaryWorkload,
+        safetyAbortMemoryPercent: 85,
+      })
+    );
+
+    // 7. Real Security & K8s Manifest Audit Scenario
+    created.push(
+      this.saveScenario({
+        clusterId: cluster.id,
+        name: `[7. Security Audit] Kiểm toán Bảo mật Cửa ngõ & K8s (${snapshot.namespace})`,
+        description: `Kiểm tra thực tế Security Headers, CORS, Auth và kiểm toán NetworkPolicy + Pod SecurityContext trên ${snapshot.namespace}.`,
+        testType: 'SECURITY_AUDIT',
         protocol: 'SECURITY_AUDIT',
         method: 'GET',
         targetBaseUrl: baseUrl,
-        targetPath: httpRoutes[0]?.path || '/healthz',
+        targetPath: primaryPath,
         headers: {},
         virtualUsers: 5,
         durationSeconds: 10,

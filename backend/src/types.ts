@@ -99,11 +99,21 @@ export interface NamespaceTopologySnapshot {
 
 export type ScenarioProtocol = 'HTTP' | 'WEBSOCKET' | 'SECURITY_AUDIT';
 
+export type PerformanceTestType =
+  | 'LOAD_TEST'
+  | 'STRESS_TEST'
+  | 'SPIKE_TEST'
+  | 'SOAK_ENDURANCE_TEST'
+  | 'SCALABILITY_TEST'
+  | 'VOLUME_TEST'
+  | 'SECURITY_AUDIT';
+
 export interface TestScenario {
   id: string;
   clusterId: string;
   name: string;
   description: string;
+  testType?: PerformanceTestType;
   protocol: ScenarioProtocol;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   targetBaseUrl: string;
@@ -111,6 +121,12 @@ export interface TestScenario {
   headers: Record<string, string>;
   requestBody?: string;
   virtualUsers: number;
+  /** Used in STRESS_TEST (step up to peak) and SPIKE_TEST (burst up to 10x peak) */
+  peakVirtualUsers?: number;
+  /** Used in VOLUME_TEST (payload size in KB or record batch size) */
+  volumePayloadKb?: number;
+  /** Used in SCALABILITY_TEST (target pod count for scaling comparison) */
+  targetPodReplicas?: number;
   durationSeconds: number;
   rampUpSeconds: number;
   targetNamespace: string;
@@ -123,10 +139,12 @@ export interface TestScenario {
 export interface LiveRunTick {
   elapsedSeconds: number;
   timestamp: string;
+  stageLabel?: string;
   external: {
     activeWorkers: number;
     requestsPerSec: number;
     totalRequests: number;
+    throughputKbps?: number;
     latencyAvgMs: number;
     latencyP50Ms: number;
     latencyP95Ms: number;
@@ -163,10 +181,27 @@ export interface SecurityAuditFinding {
   remediationVi: string;
 }
 
+export interface SpecializedTestInsights {
+  testType: PerformanceTestType;
+  /** Stress Testing: VU count where breaking point (5xx, 429, or p95 > 1500ms) occurred */
+  breakingPointVu?: number | null;
+  /** Spike Testing: Seconds needed to recover baseline latency after 10x spike */
+  spikeRecoverySeconds?: number | null;
+  /** Soak / Endurance Testing: Net Pod RAM drift (MiB) between start and end of steady phase */
+  memoryDriftMi?: number | null;
+  /** Scalability Testing: Observed RPS per Pod and replica scaling range */
+  rpsPerPod?: number | null;
+  minPodsObserved?: number;
+  maxPodsObserved?: number;
+  /** Volume Testing: Total payload volume (MB) transferred */
+  totalVolumeMbProcessed?: number | null;
+}
+
 export interface TestRunRecord {
   id: string;
   scenarioId: string;
   scenarioName: string;
+  testType?: PerformanceTestType;
   clusterId: string;
   clusterName: string;
   namespace: string;
@@ -177,6 +212,7 @@ export interface TestRunRecord {
   startedAt: string;
   finishedAt?: string;
   virtualUsers: number;
+  peakVirtualUsers?: number;
   durationSeconds: number;
   safetyBreaker: {
     armed: boolean;
@@ -189,6 +225,7 @@ export interface TestRunRecord {
   latestTick: LiveRunTick;
   ticks: LiveRunTick[];
   securityFindings: SecurityAuditFinding[];
+  specializedInsights?: SpecializedTestInsights;
   evaluation: {
     grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
     headlineVi: string;

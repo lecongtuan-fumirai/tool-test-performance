@@ -6,7 +6,9 @@ import {
   ClusterConnection,
   LiveRunTick,
   NamespaceTopologySnapshot,
+  PerformanceTestType,
   SecurityAuditFinding,
+  SpecializedTestInsights,
   TestRunRecord,
   TestScenario,
 } from '../types.js';
@@ -21,6 +23,31 @@ function computePercentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
   return Math.round(sorted[idx]);
+}
+
+/**
+ * Generates a realistic structured JSON batch payload of the specified KB size for Volume Testing.
+ */
+function buildVolumePayload(sizeKb: number): string {
+  const clampedKb = Math.max(1, Math.min(1024, sizeKb));
+  const targetBytes = clampedKb * 1024;
+  const records: Array<{ id: number; ts: string; metric: string; payload: string }> = [];
+  const chunk = 'VOL_DATA_RECORD_0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ_'.repeat(4);
+  let i = 0;
+  while (JSON.stringify(records).length < targetBytes) {
+    records.push({
+      id: ++i,
+      ts: new Date().toISOString(),
+      metric: `batch-record-${i}`,
+      payload: chunk,
+    });
+    if (i > 2500) break;
+  }
+  return JSON.stringify({
+    volumeTestBatch: true,
+    recordCount: records.length,
+    records,
+  });
 }
 
 export class RealRunnerEngine {
@@ -45,6 +72,7 @@ export class RealRunnerEngine {
     this.cleanupWorkers();
     this.activeRun.status = 'completed';
     this.activeRun.finishedAt = new Date().toISOString();
+    this.activeRun.specializedInsights = this.computeSpecializedInsights(this.activeRun);
     this.activeRun.evaluation = this.evaluateRun(this.activeRun, reason);
     storageRepo.saveTestRun(this.activeRun);
     this.onUpdate(this.activeRun);
@@ -69,6 +97,128 @@ export class RealRunnerEngine {
   }
 
   /**
+   * Computes dynamic target Virtual Users & stage label at `elapsedSec`
+   * according to the 6 standard Performance Testing types.
+   */
+  private computeTargetVuForTestType(
+    testType: PerformanceTestType,
+    elapsedSec: number,
+    durationSec: number,
+    rampSec: number,
+    baseVu: number,
+    peakVu: number,
+    volumePayloadKb?: number
+  ): { targetVu: number; stageLabel: string } {
+    const safeDuration = Math.max(5, durationSec);
+    const progress = Math.min(1, elapsedSec / safeDuration);
+
+    switch (testType) {
+      case 'STRESS_TEST': {
+        // 5 progressive step-up stages from baseVu up to peakVu to find Breaking Point
+        const stepIndex = Math.min(5, Math.floor(progress * 5) + 1);
+        const fraction = stepIndex / 5;
+        const targetVu = Math.max(
+          1,
+          Math.round(baseVu + (Math.max(baseVu, peakVu) - baseVu) * fraction)
+        );
+        return {
+          targetVu,
+          stageLabel: `Stress Bậc ${stepIndex}/5 (${targetVu} Users — Dò điểm gãy)`,
+        };
+      }
+
+      case 'SPIKE_TEST': {
+        // Phase 1 (0 - 30%): Baseline load
+        // Phase 2 (30% - 65%): Instant 10x Spike Burst!
+        // Phase 3 (65% - 100%): Instant drop to baseline to measure Recovery Time
+        if (progress < 0.3) {
+          return {
+            targetVu: baseVu,
+            stageLabel: `Baseline (Tải nền ${baseVu} Users trước cú sốc)`,
+          };
+        }
+        if (progress < 0.65) {
+          return {
+            targetVu: Math.max(baseVu * 2, peakVu),
+            stageLabel: `⚡ SPIKE BURST! (Tăng đột ngột lên ${Math.max(baseVu * 2, peakVu)} Users)`,
+          };
+        }
+        return {
+          targetVu: baseVu,
+          stageLabel: `Recovery Phase (Hạ về ${baseVu} Users — Đo thời gian hồi phục)`,
+        };
+      }
+
+      case 'SOAK_ENDURANCE_TEST': {
+        if (elapsedSec <= rampSec) {
+          const targetVu = Math.max(1, Math.ceil((elapsedSec / Math.max(1, rampSec)) * baseVu));
+          return {
+            targetVu,
+            stageLabel: `Soak Ramp-up (${targetVu}/${baseVu} Users)`,
+          };
+        }
+        return {
+          targetVu: baseVu,
+          stageLabel: `Soak / Endurance (${baseVu} Users liên tục — Dò rò rỉ RAM)`,
+        };
+      }
+
+      case 'SCALABILITY_TEST': {
+        // 3 scaling tiers to observe RPS per Pod & HPA / Replica efficiency
+        const tier = progress < 0.33 ? 1 : progress < 0.66 ? 2 : 3;
+        const maxScaleVu = Math.max(baseVu, peakVu);
+        const targetVu =
+          tier === 1
+            ? baseVu
+            : tier === 2
+            ? Math.round((baseVu + maxScaleVu) / 2)
+            : maxScaleVu;
+        return {
+          targetVu,
+          stageLabel: `Scalability Mức ${tier}/3 (${targetVu} Users — Đo hiệu suất mở rộng Pod)`,
+        };
+      }
+
+      case 'VOLUME_TEST': {
+        const kb = volumePayloadKb || 64;
+        if (elapsedSec <= rampSec) {
+          const targetVu = Math.max(1, Math.ceil((elapsedSec / Math.max(1, rampSec)) * baseVu));
+          return {
+            targetVu,
+            stageLabel: `Volume Ramp-up (${kb}KB/req • ${targetVu} Users)`,
+          };
+        }
+        return {
+          targetVu: baseVu,
+          stageLabel: `Volume Heavy Data (${kb}KB/req • ${baseVu} Users)`,
+        };
+      }
+
+      case 'SECURITY_AUDIT': {
+        return {
+          targetVu: Math.min(10, baseVu),
+          stageLabel: `Security Audit Probes (Kiểm toán Bảo mật Thực tế)`,
+        };
+      }
+
+      case 'LOAD_TEST':
+      default: {
+        if (elapsedSec <= rampSec) {
+          const targetVu = Math.max(1, Math.ceil((elapsedSec / Math.max(1, rampSec)) * baseVu));
+          return {
+            targetVu,
+            stageLabel: `Load Ramp-up (${targetVu}/${baseVu} Users)`,
+          };
+        }
+        return {
+          targetVu: baseVu,
+          stageLabel: `Steady Load (Duy trì tải dự kiến ${baseVu} Users)`,
+        };
+      }
+    }
+  }
+
+  /**
    * Starts a 100% REAL test run against the target URL & K8s cluster.
    */
   public async startScenarioRun(
@@ -76,6 +226,10 @@ export class RealRunnerEngine {
     scenario: TestScenario
   ): Promise<TestRunRecord> {
     this.cleanupWorkers();
+
+    const testType: PerformanceTestType =
+      scenario.testType ||
+      (scenario.protocol === 'SECURITY_AUDIT' ? 'SECURITY_AUDIT' : 'LOAD_TEST');
 
     const fullTargetUrl = `${scenario.targetBaseUrl.replace(/\/+$/, '')}/${scenario.targetPath.replace(/^\/+/, '')}`;
     this.abortController = new AbortController();
@@ -110,13 +264,21 @@ export class RealRunnerEngine {
       memoryLimitMi
     );
 
+    const baseVu = Math.max(1, Math.min(500, scenario.virtualUsers));
+    const peakVu = Math.max(
+      baseVu,
+      Math.min(1000, scenario.peakVirtualUsers || baseVu)
+    );
+
     const initialTick: LiveRunTick = {
       elapsedSeconds: 0,
       timestamp: new Date().toISOString(),
+      stageLabel: 'Khởi tạo luồng kiểm thử...',
       external: {
         activeWorkers: 0,
         requestsPerSec: 0,
         totalRequests: 0,
+        throughputKbps: 0,
         latencyAvgMs: 0,
         latencyP50Ms: 0,
         latencyP95Ms: 0,
@@ -134,6 +296,7 @@ export class RealRunnerEngine {
       id: `run-${crypto.randomUUID().slice(0, 8)}`,
       scenarioId: scenario.id,
       scenarioName: scenario.name,
+      testType,
       clusterId: cluster.id,
       clusterName: cluster.name,
       namespace: scenario.targetNamespace,
@@ -142,7 +305,8 @@ export class RealRunnerEngine {
       targetUrl: fullTargetUrl,
       status: 'running',
       startedAt: new Date().toISOString(),
-      virtualUsers: scenario.virtualUsers,
+      virtualUsers: baseVu,
+      peakVirtualUsers: peakVu,
       durationSeconds: scenario.durationSeconds,
       safetyBreaker: {
         armed: true,
@@ -155,9 +319,9 @@ export class RealRunnerEngine {
       securityFindings,
       evaluation: {
         grade: 'A',
-        headlineVi: `Đang thực thi kịch bản thật trên ${fullTargetUrl}...`,
+        headlineVi: `Đang thực thi [${testType}] trên ${fullTargetUrl}...`,
         nonTechSummaryVi: 'Đang thu thập số liệu phản hồi thực tế từ máy chủ và K8s API.',
-        engineerSummary: `Running ${scenario.protocol} workers against ${fullTargetUrl} (VU=${scenario.virtualUsers}, Duration=${scenario.durationSeconds}s)`,
+        engineerSummary: `Mode=${testType} | Protocol=${scenario.protocol} | Target=${fullTargetUrl} (BaseVU=${baseVu}, PeakVU=${peakVu}, Duration=${scenario.durationSeconds}s)`,
         recommendationsVi: [],
       },
     };
@@ -173,31 +337,44 @@ export class RealRunnerEngine {
     let window429 = 0;
     let window5xx = 0;
     let windowNetErr = 0;
+    let windowBytes = 0;
     let totalRequestsCount = 0;
-    let activeWorkersCount = 0;
 
-    const maxVu = Math.max(1, Math.min(500, scenario.virtualUsers));
-    const rampSec = Math.max(1, scenario.rampUpSeconds || 1);
+    // Dynamic VU state updated every second
+    let currentAllowedVu = this.computeTargetVuForTestType(
+      testType,
+      1,
+      scenario.durationSeconds,
+      scenario.rampUpSeconds || 1,
+      baseVu,
+      peakVu,
+      scenario.volumePayloadKb
+    ).targetVu;
 
-    // Spawn worker loops based on protocol
+    // Prepare effective request body (especially for VOLUME_TEST)
+    const effectiveBody =
+      scenario.requestBody && scenario.requestBody.trim().length > 0
+        ? scenario.requestBody
+        : testType === 'VOLUME_TEST'
+        ? buildVolumePayload(scenario.volumePayloadKb || 64)
+        : undefined;
+
+    const maxPoolSize = Math.max(baseVu, peakVu);
+
+    // Spawn dynamic worker pool
     if (scenario.protocol === 'HTTP' || scenario.protocol === 'SECURITY_AUDIT') {
-      for (let i = 0; i < maxVu; i++) {
-        const startDelayMs = Math.round((i / maxVu) * rampSec * 1000);
-        this.runHttpWorkerLoop(
-          i,
-          startDelayMs,
+      for (let workerIdx = 0; workerIdx < maxPoolSize; workerIdx++) {
+        this.runDynamicHttpWorker(
+          workerIdx,
+          () => currentAllowedVu,
           fullTargetUrl,
           scenario,
+          effectiveBody,
           signal,
-          () => {
-            activeWorkersCount++;
-          },
-          () => {
-            activeWorkersCount = Math.max(0, activeWorkersCount - 1);
-          },
-          (latMs, statusCode, isNetErr) => {
+          (latMs, statusCode, isNetErr, bytesTransferred) => {
             totalRequestsCount++;
             windowLatencies.push(latMs);
+            windowBytes += bytesTransferred;
             if (isNetErr) {
               windowNetErr++;
             } else if (statusCode >= 200 && statusCode < 400) {
@@ -214,22 +391,17 @@ export class RealRunnerEngine {
       }
     } else if (scenario.protocol === 'WEBSOCKET') {
       const wsUrl = fullTargetUrl.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
-      for (let i = 0; i < maxVu; i++) {
-        const startDelayMs = Math.round((i / maxVu) * rampSec * 1000);
-        this.runWebSocketWorkerLoop(
-          startDelayMs,
+      for (let workerIdx = 0; workerIdx < maxPoolSize; workerIdx++) {
+        this.runDynamicWebSocketWorker(
+          workerIdx,
+          () => currentAllowedVu,
           wsUrl,
           scenario,
           signal,
-          () => {
-            activeWorkersCount++;
-          },
-          () => {
-            activeWorkersCount = Math.max(0, activeWorkersCount - 1);
-          },
           (latMs, statusBucket) => {
             totalRequestsCount++;
             windowLatencies.push(latMs);
+            windowBytes += 128;
             if (statusBucket === '2xx') window2xx++;
             else if (statusBucket === '401_403') window401_403++;
             else if (statusBucket === '429') window429++;
@@ -247,19 +419,31 @@ export class RealRunnerEngine {
       if (!this.activeRun || signal.aborted) return;
       elapsed += 1;
 
+      const stageInfo = this.computeTargetVuForTestType(
+        testType,
+        elapsed,
+        scenario.durationSeconds,
+        scenario.rampUpSeconds || 1,
+        baseVu,
+        peakVu,
+        scenario.volumePayloadKb
+      );
+      currentAllowedVu = stageInfo.targetVu;
+
       // Snapshot and reset 1s window
       const sortedLat = [...windowLatencies].sort((a, b) => a - b);
-      const rps =
-        window2xx + window401_403 + window429 + window5xx + windowNetErr;
+      const rps = window2xx + window401_403 + window429 + window5xx + windowNetErr;
       const avgLat =
         sortedLat.length > 0
           ? Math.round(sortedLat.reduce((a, b) => a + b, 0) / sortedLat.length)
           : 0;
+      const throughputKbps = Math.round(windowBytes / 1024);
 
       const extMetrics: LiveRunTick['external'] = {
-        activeWorkers: activeWorkersCount,
+        activeWorkers: currentAllowedVu,
         requestsPerSec: rps,
         totalRequests: totalRequestsCount,
+        throughputKbps,
         latencyAvgMs: avgLat,
         latencyP50Ms: computePercentile(sortedLat, 50),
         latencyP95Ms: computePercentile(sortedLat, 95),
@@ -277,6 +461,7 @@ export class RealRunnerEngine {
       window429 = 0;
       window5xx = 0;
       windowNetErr = 0;
+      windowBytes = 0;
 
       // Poll REAL K8s Pod telemetry
       const internalMetrics = await this.pollRealK8sPodTelemetry(
@@ -289,6 +474,7 @@ export class RealRunnerEngine {
       const tick: LiveRunTick = {
         elapsedSeconds: elapsed,
         timestamp: new Date().toISOString(),
+        stageLabel: stageInfo.stageLabel,
         external: extMetrics,
         internal: internalMetrics,
       };
@@ -313,6 +499,7 @@ export class RealRunnerEngine {
           ? `Cầu chì An toàn đã tự động ngắt bài test khi bộ nhớ thực tế của Pod (${internalMetrics.totalMemoryMi} MiB) chạm ngưỡng bảo vệ ${scenario.safetyAbortMemoryPercent}% (${thresholdMemoryMi} MiB / ${memoryLimitMi} MiB).`
           : `Cầu chì An toàn đã tự động ngắt bài test do phát hiện Pod khởi động lại (RestartCount tăng từ ${baselineRestarts} lên ${internalMetrics.restartCount}).`;
         this.activeRun.safetyBreaker.trippedTechnical = `SAFETY_BREAKER_TRIPPED: mem=${internalMetrics.totalMemoryMi}MiB (threshold=${thresholdMemoryMi}MiB), restarts=${internalMetrics.restartCount}`;
+        this.activeRun.specializedInsights = this.computeSpecializedInsights(this.activeRun);
         this.activeRun.evaluation = this.evaluateRun(this.activeRun);
         storageRepo.saveTestRun(this.activeRun);
         this.onUpdate(this.activeRun);
@@ -325,6 +512,7 @@ export class RealRunnerEngine {
         this.activeRun.finishedAt = new Date().toISOString();
       }
 
+      this.activeRun.specializedInsights = this.computeSpecializedInsights(this.activeRun);
       this.activeRun.evaluation = this.evaluateRun(this.activeRun);
       storageRepo.saveTestRun(this.activeRun);
       this.onUpdate(this.activeRun);
@@ -333,144 +521,231 @@ export class RealRunnerEngine {
     return runRecord;
   }
 
-  private async runHttpWorkerLoop(
-    _workerIdx: number,
-    startDelayMs: number,
+  private async runDynamicHttpWorker(
+    workerIdx: number,
+    getAllowedVu: () => number,
     url: string,
     scenario: TestScenario,
+    effectiveBody: string | undefined,
     signal: AbortSignal,
-    onWorkerActive: () => void,
-    onWorkerStop: () => void,
-    onSample: (latMs: number, statusCode: number, isNetErr: boolean) => void
+    onSample: (latMs: number, statusCode: number, isNetErr: boolean, bytes: number) => void
   ): Promise<void> {
-    if (startDelayMs > 0) {
-      await new Promise((r) => setTimeout(r, startDelayMs));
-    }
-    if (signal.aborted) return;
+    // Stagger initial worker startup slightly over 200ms to avoid artificial thundering herd at t=0
+    await new Promise((r) => setTimeout(r, (workerIdx % 20) * 10));
 
-    onWorkerActive();
-    try {
-      while (!signal.aborted) {
-        const t0 = performance.now();
-        try {
-          const reqInit: RequestInit = {
-            method: scenario.method || 'GET',
-            headers: scenario.headers || {},
-            signal,
-          };
-          if (
-            scenario.requestBody &&
-            (scenario.method === 'POST' || scenario.method === 'PUT')
-          ) {
-            reqInit.body = scenario.requestBody;
-          }
-          const res = await fetch(url, reqInit);
-          // Consume body to free socket
-          await res.arrayBuffer().catch(() => {});
-          const elapsedMs = Math.round(performance.now() - t0);
-          onSample(elapsedMs, res.status, false);
-        } catch (err: any) {
-          if (signal.aborted) break;
-          const elapsedMs = Math.round(performance.now() - t0);
-          onSample(elapsedMs, 0, true);
-        }
-        // Small pacing pause (50ms) so 1 VU ~ up to 20 req/s depending on RTT
-        await new Promise((r) => setTimeout(r, 50));
+    while (!signal.aborted) {
+      if (workerIdx >= getAllowedVu()) {
+        // Worker is currently parked waiting for Stress/Spike step-up
+        await new Promise((r) => setTimeout(r, 150));
+        continue;
       }
-    } finally {
-      onWorkerStop();
+
+      const t0 = performance.now();
+      const reqBytes = effectiveBody ? Buffer.byteLength(effectiveBody, 'utf-8') : 0;
+      try {
+        const reqInit: RequestInit = {
+          method: scenario.method || 'GET',
+          headers: scenario.headers || {},
+          signal,
+        };
+        if (effectiveBody && (scenario.method === 'POST' || scenario.method === 'PUT')) {
+          reqInit.body = effectiveBody;
+        }
+        const res = await fetch(url, reqInit);
+        const buf = await res.arrayBuffer().catch(() => new ArrayBuffer(0));
+        const elapsedMs = Math.round(performance.now() - t0);
+        onSample(elapsedMs, res.status, false, reqBytes + buf.byteLength);
+      } catch {
+        if (signal.aborted) break;
+        const elapsedMs = Math.round(performance.now() - t0);
+        onSample(elapsedMs, 0, true, reqBytes);
+      }
+
+      await new Promise((r) => setTimeout(r, 50));
     }
   }
 
-  private async runWebSocketWorkerLoop(
-    startDelayMs: number,
+  private async runDynamicWebSocketWorker(
+    workerIdx: number,
+    getAllowedVu: () => number,
     wsUrl: string,
     scenario: TestScenario,
     signal: AbortSignal,
-    onWorkerActive: () => void,
-    onWorkerStop: () => void,
     onSample: (latMs: number, bucket: '2xx' | '401_403' | '429' | 'err') => void
   ): Promise<void> {
-    if (startDelayMs > 0) {
-      await new Promise((r) => setTimeout(r, startDelayMs));
-    }
-    if (signal.aborted) return;
+    await new Promise((r) => setTimeout(r, (workerIdx % 20) * 15));
 
-    onWorkerActive();
-    try {
-      while (!signal.aborted) {
-        const t0 = performance.now();
-        await new Promise<void>((resolve) => {
-          let settled = false;
-          const finish = () => {
-            if (!settled) {
-              settled = true;
-              resolve();
-            }
-          };
+    while (!signal.aborted) {
+      if (workerIdx >= getAllowedVu()) {
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
 
-          try {
-            const ws = new WebSocket(wsUrl, {
-              headers: scenario.headers || {},
-              handshakeTimeout: 4000,
-              rejectUnauthorized: false,
-            });
-            this.activeSockets.add(ws);
+      const t0 = performance.now();
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        };
 
-            ws.on('open', () => {
-              const handshakeMs = Math.round(performance.now() - t0);
-              onSample(handshakeMs, '2xx');
-              // Send periodic ping frames while open
-              const pingTimer = setInterval(() => {
-                if (signal.aborted || ws.readyState !== WebSocket.OPEN) {
-                  clearInterval(pingTimer);
-                  return;
-                }
-                const p0 = performance.now();
-                ws.ping( undefined, undefined, () => {
-                  onSample(Math.round(performance.now() - p0), '2xx');
-                });
-              }, 1000);
-            });
+        try {
+          const ws = new WebSocket(wsUrl, {
+            headers: scenario.headers || {},
+            handshakeTimeout: 4000,
+            rejectUnauthorized: false,
+          });
+          this.activeSockets.add(ws);
 
-            ws.on('unexpected-response', (_req, res) => {
-              const ms = Math.round(performance.now() - t0);
-              const code = res.statusCode || 0;
-              if (code === 401 || code === 403) onSample(ms, '401_403');
-              else if (code === 429) onSample(ms, '429');
-              else onSample(ms, 'err');
-              ws.terminate();
-              finish();
-            });
-
-            ws.on('close', (code) => {
-              this.activeSockets.delete(ws);
-              if (code === 1008) {
-                onSample(Math.round(performance.now() - t0), '401_403');
-              } else if (code === 1013 || code === 1009) {
-                onSample(Math.round(performance.now() - t0), '429');
+          ws.on('open', () => {
+            const handshakeMs = Math.round(performance.now() - t0);
+            onSample(handshakeMs, '2xx');
+            const pingTimer = setInterval(() => {
+              if (
+                signal.aborted ||
+                ws.readyState !== WebSocket.OPEN ||
+                workerIdx >= getAllowedVu()
+              ) {
+                clearInterval(pingTimer);
+                try {
+                  ws.close();
+                } catch {}
+                finish();
+                return;
               }
-              finish();
-            });
+              const p0 = performance.now();
+              ws.ping(undefined, undefined, () => {
+                onSample(Math.round(performance.now() - p0), '2xx');
+              });
+            }, 1000);
+          });
 
-            ws.on('error', () => {
-              this.activeSockets.delete(ws);
-              onSample(Math.round(performance.now() - t0), 'err');
-              finish();
-            });
-          } catch {
+          ws.on('unexpected-response', (_req, res) => {
+            const ms = Math.round(performance.now() - t0);
+            const code = res.statusCode || 0;
+            if (code === 401 || code === 403) onSample(ms, '401_403');
+            else if (code === 429) onSample(ms, '429');
+            else onSample(ms, 'err');
+            ws.terminate();
+            finish();
+          });
+
+          ws.on('close', (code) => {
+            this.activeSockets.delete(ws);
+            if (code === 1008) {
+              onSample(Math.round(performance.now() - t0), '401_403');
+            } else if (code === 1013 || code === 1009) {
+              onSample(Math.round(performance.now() - t0), '429');
+            }
+            finish();
+          });
+
+          ws.on('error', () => {
+            this.activeSockets.delete(ws);
             onSample(Math.round(performance.now() - t0), 'err');
             finish();
-          }
-        });
-
-        if (!signal.aborted) {
-          await new Promise((r) => setTimeout(r, 500));
+          });
+        } catch {
+          onSample(Math.round(performance.now() - t0), 'err');
+          finish();
         }
+      });
+
+      if (!signal.aborted) {
+        await new Promise((r) => setTimeout(r, 400));
       }
-    } finally {
-      onWorkerStop();
     }
+  }
+
+  /**
+   * Computes specialized metrics for the 6 Performance Test types from REAL run ticks.
+   */
+  private computeSpecializedInsights(run: TestRunRecord): SpecializedTestInsights {
+    const testType: PerformanceTestType = run.testType || 'LOAD_TEST';
+    const ticks = run.ticks.filter((t) => t.elapsedSeconds > 0);
+
+    // 1. Stress Test: Breaking Point VU detection
+    let breakingPointVu: number | null = null;
+    for (const t of ticks) {
+      const hasFailure =
+        t.external.status5xx > 0 ||
+        t.external.networkErrors > 0 ||
+        t.external.status429 > 0 ||
+        t.external.latencyP95Ms > 1500;
+      if (hasFailure) {
+        breakingPointVu = t.external.activeWorkers;
+        break;
+      }
+    }
+    if (breakingPointVu === null && run.safetyBreaker.tripped) {
+      breakingPointVu = run.latestTick.external.activeWorkers;
+    }
+
+    // 2. Spike Test: Recovery time after 10x spike
+    let spikeRecoverySeconds: number | null = null;
+    if (testType === 'SPIKE_TEST' && ticks.length >= 5) {
+      const recoveryStartSec = Math.floor(run.durationSeconds * 0.65);
+      const baselineTicks = ticks.filter(
+        (t) => t.elapsedSeconds <= Math.max(2, Math.floor(run.durationSeconds * 0.25))
+      );
+      const baselineP95 =
+        baselineTicks.length > 0
+          ? Math.max(
+              150,
+              Math.round(
+                baselineTicks.reduce((s, t) => s + t.external.latencyP95Ms, 0) /
+                  baselineTicks.length
+              )
+            )
+          : 250;
+      const postSpikeTicks = ticks.filter((t) => t.elapsedSeconds >= recoveryStartSec);
+      const recoveredTick = postSpikeTicks.find(
+        (t) =>
+          t.external.latencyP95Ms <= baselineP95 * 1.5 &&
+          t.external.status5xx === 0 &&
+          t.external.networkErrors === 0
+      );
+      if (recoveredTick) {
+        spikeRecoverySeconds = Math.max(0, recoveredTick.elapsedSeconds - recoveryStartSec);
+      }
+    }
+
+    // 3. Endurance / Soak Test: Net Pod Memory Drift (MiB)
+    let memoryDriftMi: number | null = null;
+    const memTicks = ticks.filter((t) => t.internal.totalMemoryMi !== null);
+    if (memTicks.length >= 2) {
+      const firstMem = memTicks[0].internal.totalMemoryMi!;
+      const lastMem = memTicks[memTicks.length - 1].internal.totalMemoryMi!;
+      memoryDriftMi = Math.round((lastMem - firstMem) * 10) / 10;
+    }
+
+    // 4. Scalability Test: RPS per Pod & Pod Count Range
+    const podCounts = ticks.map((t) => t.internal.podCount).filter((c) => c > 0);
+    const minPodsObserved = podCounts.length > 0 ? Math.min(...podCounts) : 0;
+    const maxPodsObserved = podCounts.length > 0 ? Math.max(...podCounts) : 0;
+    const avgRps =
+      ticks.length > 0
+        ? ticks.reduce((s, t) => s + t.external.requestsPerSec, 0) / ticks.length
+        : 0;
+    const rpsPerPod =
+      maxPodsObserved > 0 ? Math.round((avgRps / maxPodsObserved) * 10) / 10 : null;
+
+    // 5. Volume Test: Total Volume Processed (MB)
+    const totalKb = ticks.reduce((s, t) => s + (t.external.throughputKbps || 0), 0);
+    const totalVolumeMbProcessed = Math.round((totalKb / 1024) * 100) / 100;
+
+    return {
+      testType,
+      breakingPointVu,
+      spikeRecoverySeconds,
+      memoryDriftMi,
+      rpsPerPod,
+      minPodsObserved,
+      maxPodsObserved,
+      totalVolumeMbProcessed,
+    };
   }
 
   /**
@@ -768,6 +1043,7 @@ export class RealRunnerEngine {
       0
     );
 
+    const insights = run.specializedInsights;
     const recs: string[] = [];
     let grade: TestRunRecord['evaluation']['grade'] = 'A+';
 
@@ -788,6 +1064,49 @@ export class RealRunnerEngine {
       );
     }
 
+    if (insights) {
+      if (insights.testType === 'STRESS_TEST') {
+        if (insights.breakingPointVu) {
+          recs.push(
+            `[Stress Test - Điểm gãy]: Hệ thống bắt đầu xuất hiện suy giảm/chặn tải tại ngưỡng ${insights.breakingPointVu} Users đồng thời. Nên cài đặt HPA tự động mở rộng trước ngưỡng ${Math.round(insights.breakingPointVu * 0.75)} Users.`
+          );
+        } else {
+          recs.push(
+            `[Stress Test]: Hệ thống chịu đựng thành công mức tải cực đại ${run.peakVirtualUsers || run.virtualUsers} Users mà chưa xuất hiện điểm gãy.`
+          );
+        }
+      } else if (insights.testType === 'SPIKE_TEST') {
+        recs.push(
+          insights.spikeRecoverySeconds !== null && insights.spikeRecoverySeconds !== undefined
+            ? `[Spike Test - Phục hồi sau sốc 10x]: Hệ thống tự động phục hồi độ trễ ổn định sau ${insights.spikeRecoverySeconds} giây kể từ khi đỉnh Spike kết thúc.`
+            : `[Spike Test]: Đang theo dõi hoặc cần thêm thời gian để độ trễ p95 hạ về mức nền sau cú sốc tăng tải đột ngột.`
+        );
+      } else if (
+        insights.testType === 'SOAK_ENDURANCE_TEST' &&
+        insights.memoryDriftMi !== null &&
+        insights.memoryDriftMi !== undefined
+      ) {
+        if (insights.memoryDriftMi > 25) {
+          grade = grade === 'A+' ? 'B' : grade;
+          recs.push(
+            `[Soak Test - Cảnh báo Rò rỉ RAM]: Bộ nhớ Pod tăng thêm +${insights.memoryDriftMi} MiB sau thời gian chạy liên tục mà chưa giải phóng hết. Cần kiểm tra Memory Leak / vùng đệm.`
+          );
+        } else {
+          recs.push(
+            `[Soak Test - Độ bền]: Độ lệch RAM trong suốt phiên chạy là ${insights.memoryDriftMi >= 0 ? `+${insights.memoryDriftMi}` : insights.memoryDriftMi} MiB (Garbage Collector hoạt động ổn định, không có dấu hiệu Memory Leak).`
+          );
+        }
+      } else if (insights.testType === 'SCALABILITY_TEST') {
+        recs.push(
+          `[Scalability Test]: Quan sát từ ${insights.minPodsObserved || 1} đến ${insights.maxPodsObserved || 1} Pod, đạt hiệu suất trung bình ${insights.rpsPerPod ?? 0} req/s trên mỗi Pod.`
+        );
+      } else if (insights.testType === 'VOLUME_TEST') {
+        recs.push(
+          `[Volume Test]: Đã truyền tải và xử lý tổng cộng ${insights.totalVolumeMbProcessed ?? 0} MB dữ liệu khối lượng lớn qua hệ thống.`
+        );
+      }
+    }
+
     if (total429 > 0) {
       recs.push(
         `Hệ thống đã chủ động cắt ${total429} yêu cầu vượt ngưỡng bằng mã HTTP 429 (Rate-Limit hoạt động đúng thiết kế).`
@@ -802,9 +1121,7 @@ export class RealRunnerEngine {
     }
 
     if (recs.length === 0) {
-      recs.push(
-        'Hệ thống vận hành ổn định, độ trễ thấp và đáp ứng tốt mức tải hiện tại.'
-      );
+      recs.push('Hệ thống vận hành ổn định, độ trễ thấp và đáp ứng tốt mức tải hiện tại.');
     }
 
     const lastMemStr =
@@ -821,9 +1138,9 @@ export class RealRunnerEngine {
       headlineVi: run.safetyBreaker.tripped
         ? `⚡ Đã ngắt an toàn bởi Cầu chì Tự động khi RAM chạm ${run.latestTick.internal.totalMemoryMi} MiB`
         : customStopNote ||
-          `Hoàn tất kiểm thử thật trên ${run.targetUrl}: Tổng ${totalReq} yêu cầu, Độ trễ p95 cao nhất ${maxP95}ms, RAM Pod ${lastMemStr}`,
-      nonTechSummaryVi: `Trong phiên kiểm thử thực tế với ${run.virtualUsers} người dùng đồng thời vào ${run.targetUrl}, máy chủ đã xử lý thành công ${total2xx}/${totalReq} yêu cầu (chặn quá tải 429: ${total429}, lỗi: ${total5xx}). Độ trễ phản hồi thực tế (p95) là ${maxP95}ms và mức tiêu thụ RAM của máy chủ trên K8s là ${lastMemStr}.`,
-      engineerSummary: `Target=${run.targetUrl} | TotalReq=${totalReq} (2xx=${total2xx}, 429=${total429}, 5xx/Err=${total5xx}) | Max_p95=${maxP95}ms | Pod_RAM=${lastMemStr}`,
+          `Hoàn tất [${run.testType || 'LOAD_TEST'}] trên ${run.targetUrl}: Tổng ${totalReq} yêu cầu, Độ trễ p95 cao nhất ${maxP95}ms, RAM Pod ${lastMemStr}`,
+      nonTechSummaryVi: `Trong phiên kiểm thử [${run.testType || 'LOAD_TEST'}] (từ ${run.virtualUsers} đến ${run.peakVirtualUsers || run.virtualUsers} người dùng đồng thời) vào ${run.targetUrl}, máy chủ đã xử lý thành công ${total2xx}/${totalReq} yêu cầu (chặn quá tải 429: ${total429}, lỗi: ${total5xx}). Độ trễ phản hồi thực tế (p95) là ${maxP95}ms và mức tiêu thụ RAM của máy chủ trên K8s là ${lastMemStr}.`,
+      engineerSummary: `Type=${run.testType || 'LOAD_TEST'} | Target=${run.targetUrl} | TotalReq=${totalReq} (2xx=${total2xx}, 429=${total429}, 5xx/Err=${total5xx}) | Max_p95=${maxP95}ms | Pod_RAM=${lastMemStr}`,
       recommendationsVi: recs,
     };
   }

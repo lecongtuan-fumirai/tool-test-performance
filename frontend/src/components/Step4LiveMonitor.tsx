@@ -144,6 +144,9 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+            <span className="font-mono text-cyan-300 bg-cyan-950/50 border border-cyan-500/20 px-2 py-0.5 rounded font-semibold">
+              {currentRun.testType || 'LOAD_TEST'}
+            </span>
             <span className="font-mono text-indigo-300 bg-indigo-950/50 border border-indigo-500/20 px-2 py-0.5 rounded">
               [{currentRun.protocol}] {currentRun.targetUrl}
             </span>
@@ -159,6 +162,14 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                 {latestTick?.elapsedSeconds || 0}s / {currentRun.durationSeconds}s
               </strong>
             </span>
+            {latestTick?.stageLabel && (
+              <>
+                <span>•</span>
+                <span className="text-emerald-300 font-semibold">
+                  Giai đoạn: {latestTick.stageLabel}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -215,6 +226,76 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
               </span>
               {currentRun.safetyBreaker.trippedReasonVi ||
                 currentRun.safetyBreaker.trippedTechnical}
+            </div>
+          </div>
+        )}
+
+        {/* Specialized Metrics Strip for the 6 Performance Test Types */}
+        {currentRun.specializedInsights && (
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-cyan-300 font-semibold">
+              <Activity className="w-4 h-4" />
+              <span>Chỉ số Chuyên biệt ({currentRun.specializedInsights.testType}):</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-slate-300 font-mono">
+              {currentRun.specializedInsights.testType === 'STRESS_TEST' && (
+                <span>
+                  Điểm gãy (Breaking Point):{' '}
+                  <strong className="text-rose-300">
+                    {currentRun.specializedInsights.breakingPointVu
+                      ? `${currentRun.specializedInsights.breakingPointVu} Users`
+                      : `Chưa gãy (Chịu tốt tới ${currentRun.peakVirtualUsers || currentRun.virtualUsers} Users)`}
+                  </strong>
+                </span>
+              )}
+              {currentRun.specializedInsights.testType === 'SPIKE_TEST' && (
+                <span>
+                  Thời gian hồi phục sau Spike 10x:{' '}
+                  <strong className="text-amber-300">
+                    {currentRun.specializedInsights.spikeRecoverySeconds !== null &&
+                    currentRun.specializedInsights.spikeRecoverySeconds !== undefined
+                      ? `${currentRun.specializedInsights.spikeRecoverySeconds} giây`
+                      : 'Đang đo lường...'}
+                  </strong>
+                </span>
+              )}
+              {currentRun.specializedInsights.testType === 'SOAK_ENDURANCE_TEST' && (
+                <span>
+                  Độ lệch Rò rỉ Bộ nhớ (Memory Drift):{' '}
+                  <strong className="text-emerald-300">
+                    {currentRun.specializedInsights.memoryDriftMi !== null &&
+                    currentRun.specializedInsights.memoryDriftMi !== undefined
+                      ? `${currentRun.specializedInsights.memoryDriftMi >= 0 ? '+' : ''}${currentRun.specializedInsights.memoryDriftMi} MiB`
+                      : 'Chờ K8s Metrics...'}
+                  </strong>
+                </span>
+              )}
+              {currentRun.specializedInsights.testType === 'SCALABILITY_TEST' && (
+                <span>
+                  Hiệu suất mở rộng:{' '}
+                  <strong className="text-indigo-300">
+                    {currentRun.specializedInsights.rpsPerPod ?? 0} req/s/Pod (Quan sát:{' '}
+                    {currentRun.specializedInsights.minPodsObserved || 1} →{' '}
+                    {currentRun.specializedInsights.maxPodsObserved || 1} Pods)
+                  </strong>
+                </span>
+              )}
+              {currentRun.specializedInsights.testType === 'VOLUME_TEST' && (
+                <span>
+                  Khối lượng Dữ liệu Lớn đã xử lý:{' '}
+                  <strong className="text-purple-300">
+                    {currentRun.specializedInsights.totalVolumeMbProcessed ?? 0} MB ({ext?.throughputKbps || 0} KB/s)
+                  </strong>
+                </span>
+              )}
+              {currentRun.specializedInsights.testType === 'LOAD_TEST' && (
+                <span>
+                  Tải dự kiến duy trì:{' '}
+                  <strong className="text-cyan-300">
+                    {currentRun.virtualUsers} Users đồng thời
+                  </strong>
+                </span>
+              )}
             </div>
           </div>
         )}
