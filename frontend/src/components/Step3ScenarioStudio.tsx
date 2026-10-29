@@ -580,3 +580,4 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
     </div>
   );
 };
+
