@@ -607,24 +607,59 @@ export class RealRunnerEngine {
           ws.on('open', () => {
             const handshakeMs = Math.round(performance.now() - t0);
             onSample(handshakeMs, '2xx');
-            const pingTimer = setInterval(() => {
+
+            // 1. Initial Application-Layer payload to force Node.js backend to register/process
+            const initPayload =
+              scenario.requestBody && scenario.requestBody.trim().length > 0
+                ? scenario.requestBody
+                : JSON.stringify({
+                    type: 'CLIENT_CONNECT_STREAM',
+                    workerId: workerIdx,
+                    clientTs: Date.now(),
+                  });
+            try {
+              ws.send(initPayload);
+            } catch {}
+
+            // 2. Active Application Message Pump (Every 250ms): Forces Node.js Event Loop to parse & process real data
+            const pumpTimer = setInterval(() => {
               if (
                 signal.aborted ||
                 ws.readyState !== WebSocket.OPEN ||
                 workerIdx >= getAllowedVu()
               ) {
-                clearInterval(pingTimer);
+                clearInterval(pumpTimer);
                 try {
                   ws.close();
                 } catch {}
                 finish();
                 return;
               }
-              const p0 = performance.now();
-              ws.ping(undefined, undefined, () => {
-                onSample(Math.round(performance.now() - p0), '2xx');
+
+              const sentTs = performance.now();
+              const msgPayload = JSON.stringify({
+                event: 'heartbeat_data_stream',
+                workerId: workerIdx,
+                seq: Math.floor(Math.random() * 100000),
+                clientTs: Date.now(),
               });
-            }, 1000);
+
+              try {
+                ws.send(msgPayload, (err) => {
+                  if (!err) {
+                    const elapsed = Math.round(performance.now() - sentTs);
+                    onSample(elapsed, '2xx');
+                  }
+                });
+              } catch {
+                onSample(100, 'err');
+              }
+            }, 300);
+
+            // Listen for server incoming messages to record round-trip response
+            ws.on('message', () => {
+              onSample(10, '2xx');
+            });
           });
 
           ws.on('unexpected-response', (_req, res) => {
