@@ -1,250 +1,199 @@
-export type ConnectionMode = 'hybrid-simulator' | 'k8s-kubeconfig' | 'k8s-ssh-tunnel' | 'external-url';
+export type ConnectionType = 'local-kubeconfig' | 'imported-kubeconfig' | 'external-url';
 
-export type ProtocolDriverType = 'http-rest' | 'ws-realtime' | 'k8s-manifest-audit';
+export type EnvironmentType = 'production' | 'staging' | 'development';
 
-export type HealthSignal = 'healthy' | 'warning' | 'critical' | 'blocked-safely';
+export interface ClusterConnection {
+  id: string;
+  name: string;
+  environment: EnvironmentType;
+  connectionType: ConnectionType;
+  /** AES-256-GCM encrypted kubeconfig YAML (never exposed to frontend) */
+  encryptedKubeconfig?: string;
+  kubeContext?: string;
+  externalBaseUrl: string;
+  sshTunnelHint?: string;
+  createdAt: string;
+  lastCheckedAt?: string;
+  status: 'connected' | 'disconnected' | 'unverified';
+  k8sVersion?: string;
+  apiLatencyMs?: number;
+  statusMessage?: string;
+}
 
-export interface SshTunnelConfig {
-  enabled: boolean;
+/** Safe DTO sent to Frontend (never includes encryptedKubeconfig) */
+export type ClusterConnectionPublic = Omit<ClusterConnection, 'encryptedKubeconfig'> & {
+  hasKubeconfig: boolean;
+};
+
+export interface DiscoveredIngressRoute {
+  ingressName: string;
   host: string;
-  port: number;
-  user: string;
-  localPort: number;
-  remoteK8sPort: number;
-  commandPreview: string;
-  tunnelConnected?: boolean;
-}
-
-export interface TargetProfile {
-  id: string;
-  name: string;
-  environment: 'production' | 'staging' | 'custom';
-  connectionMode: ConnectionMode;
-  namespace: string;
-  availableNamespaces: string[];
-  clusterEndpoint: string;
-  externalUrl: string;
-  wsEndpoint?: string;
-  sshTunnel?: SshTunnelConfig;
-  kubeconfigContext?: string;
-  authHeaderHint?: string;
-  description: string;
-  tags: string[];
-  lastDiscoveredAt: string;
-}
-
-export interface IngressRouteInfo {
+  tlsEnabled: boolean;
   path: string;
-  pathType: 'Prefix' | 'Exact';
-  protocol: 'HTTPS' | 'WSS';
-  targetService: string;
-  targetPort: number;
-  middlewares: string[];
-  descriptionVi: string;
+  pathType: string;
+  protocol: 'HTTPS' | 'HTTP' | 'WSS';
+  serviceName: string;
+  servicePort: number | string;
+  annotations: Record<string, string>;
 }
 
-export interface MiddlewareShieldInfo {
-  id: string;
-  name: string;
-  layer: 'cloudflare-edge' | 'traefik-ingress' | 'k8s-network-policy' | 'app-gateway' | 'pod-runtime';
-  type: 'rate-limit' | 'security-headers' | 'network-policy' | 'session-quota' | 'pod-security';
-  configSummary: string;
-  active: boolean;
-  nonTechLabelVi: string;
-  nonTechDescVi: string;
+export interface DiscoveredPodMetric {
+  podName: string;
+  phase: string;
+  ready: boolean;
+  restartCount: number;
+  nodeName: string;
+  podIp: string;
+  cpuMillicores: number | null;
+  memoryMi: number | null;
+  ageSeconds: number;
 }
 
-export interface WorkloadInfo {
+export interface DiscoveredWorkload {
   name: string;
   kind: 'Deployment' | 'StatefulSet';
-  namespace: string;
   replicas: number;
   readyReplicas: number;
   image: string;
-  memoryRequestMi: number;
-  memoryLimitMi: number;
-  v8HeapLimitMb: number;
-  cpuRequestMillicores: number;
-  cpuLimitMillicores: number;
-  configEnv: Record<string, string>;
+  memoryRequestMi: number | null;
+  memoryLimitMi: number | null;
+  cpuRequestMillicores: number | null;
+  cpuLimitMillicores: number | null;
+  envKeys: string[];
   securityContext: {
     runAsNonRoot: boolean;
     readOnlyRootFilesystem: boolean;
     allowPrivilegeEscalation: boolean;
   };
+  pods: DiscoveredPodMetric[];
 }
 
-export interface ResolvedContextVariables {
-  'target.ingress.host': string;
-  'target.ingress.baseUrl': string;
-  'target.ingress.wsUrl': string;
-  'target.namespace': string;
-  'target.workload.name': string;
-  'target.workload.memoryLimitMi': number;
-  'target.workload.v8HeapLimitMb': number;
-  'target.workload.cpuLimitMillicores': number;
-  'target.workload.replicas': number;
-  'target.safety.abortMemoryMi': number;
-  'target.safety.abortPercent': number;
-  'target.config.MAX_SESSIONS': number;
-  'target.middleware.rateLimitRps': number;
-  [key: string]: string | number;
+export interface DiscoveredService {
+  name: string;
+  type: string;
+  clusterIp: string;
+  ports: Array<{ name?: string; port: number; targetPort: number | string; protocol: string }>;
+  selector: Record<string, string>;
 }
 
-export interface DiscoveredTopology {
-  targetId: string;
+export interface DiscoveredNetworkPolicy {
+  name: string;
+  podSelector: Record<string, string>;
+  policyTypes: string[];
+  ingressRulesCount: number;
+  egressRulesCount: number;
+}
+
+export interface NamespaceTopologySnapshot {
+  clusterId: string;
   namespace: string;
-  ingressHost: string;
-  tlsEnabled: boolean;
-  routes: IngressRouteInfo[];
-  shields: MiddlewareShieldInfo[];
-  serviceName: string;
-  servicePort: number;
-  workload: WorkloadInfo;
-  resourceQuota: {
-    hardMemoryLimitMi: number;
-    hardCpuLimitMillicores: number;
-    maxPods: number;
-  };
-  contextVariables: ResolvedContextVariables;
+  discoveredAt: string;
+  k8sConnected: boolean;
+  metricsServerAvailable: boolean;
+  errorMessage?: string;
+  ingresses: DiscoveredIngressRoute[];
+  services: DiscoveredService[];
+  workloads: DiscoveredWorkload[];
+  networkPolicies: DiscoveredNetworkPolicy[];
 }
 
-export interface ScenarioAssertion {
+export type ScenarioProtocol = 'HTTP' | 'WEBSOCKET' | 'SECURITY_AUDIT';
+
+export interface TestScenario {
   id: string;
-  layer: 'cloudflare-edge' | 'traefik-ingress' | 'k8s-network-policy' | 'app-gateway' | 'pod-runtime';
+  clusterId: string;
+  name: string;
+  description: string;
+  protocol: ScenarioProtocol;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  targetBaseUrl: string;
+  targetPath: string;
+  headers: Record<string, string>;
+  requestBody?: string;
+  virtualUsers: number;
+  durationSeconds: number;
+  rampUpSeconds: number;
+  targetNamespace: string;
+  targetWorkload?: string;
+  safetyAbortMemoryPercent: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LiveRunTick {
+  elapsedSeconds: number;
+  timestamp: string;
+  external: {
+    activeWorkers: number;
+    requestsPerSec: number;
+    totalRequests: number;
+    latencyAvgMs: number;
+    latencyP50Ms: number;
+    latencyP95Ms: number;
+    latencyP99Ms: number;
+    status2xx: number;
+    status401_403: number;
+    status429: number;
+    status5xx: number;
+    networkErrors: number;
+  };
+  internal: {
+    metricsAvailable: boolean;
+    podCount: number;
+    primaryPodName: string;
+    podPhase: string;
+    totalCpuMillicores: number | null;
+    totalMemoryMi: number | null;
+    memoryLimitMi: number | null;
+    memoryUsagePercent: number | null;
+    restartCount: number;
+    recentEvent: string;
+    recentLogLine: string;
+  };
+}
+
+export interface SecurityAuditFinding {
+  id: string;
+  category: 'EDGE_TLS_HEADERS' | 'AUTH_ACCESS' | 'CORS_ORIGIN' | 'K8S_NETPOL' | 'K8S_POD_SECURITY';
   titleVi: string;
   technicalCheck: string;
-  expectedOutcome: string;
-}
-
-export interface ScenarioPack {
-  id: string;
-  name: string;
-  category: 'load-testing' | 'security-verification' | 'chaos-safety';
-  protocolDrivers: ProtocolDriverType[];
-  compatibleTargets: string[];
-  summaryVi: string;
-  technicalDescription: string;
-  durationSeconds: number;
-  templateConfig: {
-    endpointTemplate: string;
-    maxVirtualUsers: number;
-    rampUpSeconds: number;
-    targetRps: number;
-    payloadType: 'binary-audio-chunks' | 'json-rest' | 'security-probe-suite';
-    safetyAbortAtMemoryPercent: number;
-    dynamicVariablesUsed: string[];
-  };
-  assertions: ScenarioAssertion[];
-  yamlManifestPreview: string;
-}
-
-export interface ExternalTestMetrics {
-  activeVirtualUsers: number;
-  activeWsSessions: number;
-  currentRps: number;
-  latencyP50Ms: number;
-  latencyP95Ms: number;
-  latencyP99Ms: number;
-  status2xxPerSec: number;
-  status429RateLimitedPerSec: number;
-  status401or403BlockedPerSec: number;
-  status5xxErrorPerSec: number;
-}
-
-export interface InternalClusterTelemetry {
-  podName: string;
-  podStatus: 'Running' | 'Pending' | 'OOMKilled' | 'CrashLoopBackOff' | 'Throttled';
-  podMemoryMi: number;
-  podMemoryLimitMi: number;
-  podMemoryPercent: number;
-  v8HeapUsedMb: number;
-  v8HeapLimitMb: number;
-  podCpuMillicores: number;
-  podCpuLimitMillicores: number;
-  podCpuPercent: number;
-  nodeMemoryPercent: number;
-  restartCount: number;
-  gcPauseMs: number;
-  recentK8sEvent: string;
-  recentPodLog: string;
-}
-
-export interface SecurityCheckResult {
-  id: string;
-  layer: 'cloudflare-edge' | 'traefik-ingress' | 'k8s-network-policy' | 'app-gateway' | 'pod-runtime';
-  layerNameVi: string;
-  attackNameVi: string;
-  rawProbe: string;
-  httpStatusOrK8sState: string;
-  blockedRatePercent: number;
-  status: 'passed' | 'warning' | 'failed';
+  observedResult: string;
+  status: 'PASS' | 'WARN' | 'FAIL';
   nonTechExplanationVi: string;
+  remediationVi: string;
 }
 
-export interface ActionableRecommendation {
+export interface TestRunRecord {
   id: string;
-  severity: 'high' | 'medium' | 'info';
-  targetComponent: string;
-  titleVi: string;
-  nonTechImpactVi: string;
-  engineerFixSnippet: string;
-}
-
-export interface SafetyCircuitBreakerState {
-  armed: boolean;
-  tripped: boolean;
-  trippedAtSecond?: number;
-  reactionTimeMs?: number;
-  thresholdPercent: number;
-  thresholdMemoryMi: number;
-  reasonVi?: string;
-  technicalReason?: string;
-}
-
-export interface CorrelatedTick {
-  timestamp: string;
-  elapsedSeconds: number;
-  totalDurationSeconds: number;
-  external: ExternalTestMetrics;
-  internal: InternalClusterTelemetry;
-  nodeStates: {
-    edgeStatus: HealthSignal;
-    ingressStatus: HealthSignal;
-    networkPolicyStatus: HealthSignal;
-    serviceStatus: HealthSignal;
-    podStatus: HealthSignal;
-  };
-  correlation: {
-    bottleneckLayer: 'none' | 'traefik-ingress-shield' | 'app-session-quota' | 'pod-memory-saturation' | 'safety-circuit-breaker';
-    headlineVi: string;
-    engineerDiagnosis: string;
-    nonTechDiagnosisVi: string;
-    userExperiencePreview: {
-      simulatedSubtitleDelayMs: number;
-      sampleSpokenTextVi: string;
-      sampleDisplayedTextVi: string;
-      experienceLabelVi: string;
-      capacityUsersSafe: number;
-      capacityUsersCurrent: number;
-    };
-  };
-}
-
-export interface ActiveTestRunState {
-  runId: string;
-  targetId: string;
   scenarioId: string;
   scenarioName: string;
-  category: ScenarioPack['category'];
-  executionMode: 'hybrid-physics-correlator' | 'live-http-ws-probe';
-  status: 'idle' | 'running' | 'completed' | 'aborted-by-circuit-breaker';
-  startedAt?: string;
-  completedAt?: string;
-  safetyBreaker: SafetyCircuitBreakerState;
-  latestTick: CorrelatedTick;
-  history: CorrelatedTick[];
-  securityResults: SecurityCheckResult[];
-  overallGrade: 'A+' | 'A' | 'B+' | 'B' | 'C' | 'D' | 'F';
-  recommendations: ActionableRecommendation[];
+  clusterId: string;
+  clusterName: string;
+  namespace: string;
+  targetWorkload?: string;
+  protocol: ScenarioProtocol;
+  targetUrl: string;
+  status: 'idle' | 'running' | 'completed' | 'aborted-by-safety' | 'failed';
+  startedAt: string;
+  finishedAt?: string;
+  virtualUsers: number;
+  durationSeconds: number;
+  safetyBreaker: {
+    armed: boolean;
+    thresholdPercent: number;
+    thresholdMemoryMi: number | null;
+    tripped: boolean;
+    trippedReasonVi?: string;
+    trippedTechnical?: string;
+  };
+  latestTick: LiveRunTick;
+  ticks: LiveRunTick[];
+  securityFindings: SecurityAuditFinding[];
+  evaluation: {
+    grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+    headlineVi: string;
+    nonTechSummaryVi: string;
+    engineerSummary: string;
+    recommendationsVi: string[];
+  };
 }

@@ -1,34 +1,23 @@
 import express from 'express';
 import cors from 'cors';
-import http from 'http';
+import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { TargetDiscoveryManager } from './connectors/targetDiscovery.js';
-import { BUILTIN_SCENARIO_PACKS, resolveScenarioForTopology } from './engine/scenarioPacks.js';
-import { BiDirectionalCorrelatorEngine } from './engine/correlatorEngine.js';
-import { ActiveTestRunState, ScenarioPack } from './types.js';
+import { storageRepo } from './storage/repository.js';
+import { k8sDiscoveryService } from './services/k8sDiscoveryService.js';
+import { RealRunnerEngine } from './services/realRunnerEngine.js';
+import { TestRunRecord } from './types.js';
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '5mb' }));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/studio' });
 
-const discoveryManager = new TargetDiscoveryManager();
-let activeTargetId = 'fumi-live-prod';
-const customScenarios: ScenarioPack[] = [];
-
-function getAllResolvedScenarios(targetId: string): ScenarioPack[] {
-  const topology = discoveryManager.getTopology(targetId);
-  return [...BUILTIN_SCENARIO_PACKS, ...customScenarios].map((s) =>
-    resolveScenarioForTopology(s, topology)
-  );
-}
-
-function broadcastState(state: ActiveTestRunState) {
+function broadcastRunUpdate(run: TestRunRecord) {
   const payload = JSON.stringify({
-    type: 'STATE_UPDATE',
-    state,
+    type: 'RUN_UPDATE',
+    run,
   });
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {
@@ -37,106 +26,238 @@ function broadcastState(state: ActiveTestRunState) {
   }
 }
 
-const correlator = new BiDirectionalCorrelatorEngine(
-  discoveryManager.getTopology(activeTargetId),
-  (updatedState) => {
-    broadcastState(updatedState);
-  }
-);
+const runnerEngine = new RealRunnerEngine((run) => {
+  broadcastRunUpdate(run);
+});
 
 wss.on('connection', (ws) => {
-  ws.send(
-    JSON.stringify({
-      type: 'STATE_UPDATE',
-      state: correlator.getState(),
-    })
-  );
-});
-
-app.get('/api/studio/bootstrap', (_req, res) => {
-  const targets = discoveryManager.listTargets();
-  const activeTarget = discoveryManager.getTarget(activeTargetId) || targets[0];
-  const topology = discoveryManager.getTopology(activeTarget.id);
-  const scenarios = getAllResolvedScenarios(activeTarget.id);
-
-  res.json({
-    targets,
-    activeTarget,
-    topology,
-    scenarios,
-    runState: correlator.getState(),
-  });
-});
-
-app.post('/api/targets/select', (req, res) => {
-  const { targetId } = req.body as { targetId: string };
-  const target = discoveryManager.getTarget(targetId);
-  if (!target) {
-    res.status(404).json({ error: `Target '${targetId}' not found` });
-    return;
+  const activeRun = runnerEngine.getActiveRun();
+  if (activeRun) {
+    ws.send(
+      JSON.stringify({
+        type: 'RUN_UPDATE',
+        run: activeRun,
+      })
+    );
   }
-  activeTargetId = target.id;
-  const topology = discoveryManager.getTopology(activeTargetId);
-  const runState = correlator.switchTarget(topology);
-  const scenarios = getAllResolvedScenarios(activeTargetId);
+});
 
+// ============================================================================
+// STEP 1: CLUSTER CONNECTIONS & ENCRYPTED VAULT API
+// ============================================================================
+app.get('/api/clusters', (_req, res) => {
   res.json({
-    activeTarget: target,
-    topology,
-    scenarios,
-    runState,
+    clusters: storageRepo.listClustersPublic(),
   });
 });
 
-app.post('/api/targets/connect', async (req, res) => {
+app.post('/api/clusters/import-local', async (_req, res) => {
   try {
-    const result = await discoveryManager.addOrUpdateTarget(req.body);
-    activeTargetId = result.target.id;
-    const runState = correlator.switchTarget(result.topology);
-    const scenarios = getAllResolvedScenarios(activeTargetId);
-
+    const imported = storageRepo.importFromLocalKubeconfig();
+    // Verify connectivity for each imported cluster
+    for (const pub of imported) {
+      const internal = storageRepo.getClusterInternal(pub.id);
+      if (internal) {
+        await k8sDiscoveryService.verifyClusterConnection(internal);
+      }
+    }
     res.json({
-      targets: discoveryManager.listTargets(),
-      activeTarget: result.target,
-      topology: result.topology,
-      scenarios,
-      runState,
-      liveK8sConnected: result.liveK8sConnected,
+      clusters: storageRepo.listClustersPublic(),
     });
   } catch (err) {
     res.status(400).json({
-      error: err instanceof Error ? err.message : 'Failed to connect target',
+      error: err instanceof Error ? err.message : 'Không thể đọc ~/.kube/config',
     });
   }
 });
 
-app.post('/api/scenarios/start', (req, res) => {
-  const { scenarioId, executionMode } = req.body as {
-    scenarioId: string;
-    executionMode?: 'hybrid-physics-correlator' | 'live-http-ws-probe';
-  };
-  const topology = discoveryManager.getTopology(activeTargetId);
-  const rawScenario =
-    [...BUILTIN_SCENARIO_PACKS, ...customScenarios].find((s) => s.id === scenarioId) ||
-    BUILTIN_SCENARIO_PACKS[0];
+app.post('/api/clusters', async (req, res) => {
+  try {
+    const {
+      name,
+      environment,
+      connectionType,
+      kubeconfigYaml,
+      externalBaseUrl,
+      sshTunnelHint,
+    } = req.body;
 
-  const runState = correlator.startScenarioRun(
-    topology,
-    rawScenario,
-    executionMode || 'hybrid-physics-correlator'
+    if (!name || !name.trim()) {
+      res.status(400).json({ error: 'Vui lòng nhập tên kết nối (Cluster / Hệ thống)' });
+      return;
+    }
+
+    const created = storageRepo.addClusterConnection({
+      name,
+      environment: environment || 'production',
+      connectionType: connectionType || 'imported-kubeconfig',
+      kubeconfigYaml,
+      externalBaseUrl: externalBaseUrl || '',
+      sshTunnelHint,
+    });
+
+    const pingResult = await k8sDiscoveryService.verifyClusterConnection(created);
+    const updated = storageRepo.getClusterInternal(created.id)!;
+
+    res.json({
+      cluster: storageRepo.toPublicCluster(updated),
+      pingResult,
+      clusters: storageRepo.listClustersPublic(),
+    });
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : 'Lỗi khi lưu kết nối cụm',
+    });
+  }
+});
+
+app.post('/api/clusters/:id/ping', async (req, res) => {
+  const cluster = storageRepo.getClusterInternal(req.params.id);
+  if (!cluster) {
+    res.status(404).json({ error: 'Không tìm thấy kết nối cụm' });
+    return;
+  }
+  const pingResult = await k8sDiscoveryService.verifyClusterConnection(cluster);
+  const updated = storageRepo.getClusterInternal(cluster.id)!;
+  res.json({
+    cluster: storageRepo.toPublicCluster(updated),
+    pingResult,
+    clusters: storageRepo.listClustersPublic(),
+  });
+});
+
+app.delete('/api/clusters/:id', (req, res) => {
+  storageRepo.deleteClusterConnection(req.params.id);
+  res.json({
+    clusters: storageRepo.listClustersPublic(),
+  });
+});
+
+// ============================================================================
+// STEP 2: REAL K8S NAMESPACE & TOPOLOGY DISCOVERY API
+// ============================================================================
+app.get('/api/clusters/:id/namespaces', async (req, res) => {
+  const cluster = storageRepo.getClusterInternal(req.params.id);
+  if (!cluster) {
+    res.status(404).json({ error: 'Không tìm thấy kết nối cụm' });
+    return;
+  }
+  try {
+    const namespaces = await k8sDiscoveryService.listNamespaces(cluster);
+    res.json({ namespaces });
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : 'Không thể lấy danh sách Namespace từ K8s API',
+    });
+  }
+});
+
+app.get('/api/clusters/:id/topology', async (req, res) => {
+  const cluster = storageRepo.getClusterInternal(req.params.id);
+  if (!cluster) {
+    res.status(404).json({ error: 'Không tìm thấy kết nối cụm' });
+    return;
+  }
+  const namespace = String(req.query.namespace || 'default');
+  const snapshot = await k8sDiscoveryService.discoverNamespaceTopology(cluster, namespace);
+  res.json({
+    snapshot,
+    cluster: storageRepo.toPublicCluster(storageRepo.getClusterInternal(cluster.id)!),
+  });
+});
+
+// ============================================================================
+// STEP 3: DYNAMIC SCENARIO BUILDER API
+// ============================================================================
+app.get('/api/scenarios', (req, res) => {
+  const clusterId = req.query.clusterId ? String(req.query.clusterId) : undefined;
+  res.json({
+    scenarios: storageRepo.listScenarios(clusterId),
+  });
+});
+
+app.post('/api/scenarios/generate-from-topology', async (req, res) => {
+  const { clusterId, namespace } = req.body as { clusterId: string; namespace: string };
+  const cluster = storageRepo.getClusterInternal(clusterId);
+  if (!cluster) {
+    res.status(404).json({ error: 'Không tìm thấy kết nối cụm' });
+    return;
+  }
+  const snapshot = await k8sDiscoveryService.discoverNamespaceTopology(
+    cluster,
+    namespace || 'default'
   );
-  res.json({ runState });
+  const generated = storageRepo.generateScenariosFromTopology(cluster, snapshot);
+  res.json({
+    generated,
+    scenarios: storageRepo.listScenarios(clusterId),
+  });
 });
 
-app.post('/api/scenarios/stop', (_req, res) => {
-  const topology = discoveryManager.getTopology(activeTargetId);
-  const runState = correlator.stopCurrentRun(topology);
-  res.json({ runState });
+app.post('/api/scenarios', (req, res) => {
+  try {
+    const saved = storageRepo.saveScenario(req.body);
+    res.json({
+      scenario: saved,
+      scenarios: storageRepo.listScenarios(saved.clusterId),
+    });
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : 'Không thể lưu kịch bản',
+    });
+  }
 });
 
-const PORT = Number(process.env.PORT) || 3334;
-server.listen(PORT, () => {
+app.delete('/api/scenarios/:id', (req, res) => {
+  const existing = storageRepo.getScenario(req.params.id);
+  storageRepo.deleteScenario(req.params.id);
+  res.json({
+    scenarios: storageRepo.listScenarios(existing?.clusterId),
+  });
+});
+
+// ============================================================================
+// STEP 4: REAL LOAD & SECURITY RUNNER + RUN HISTORY API
+// ============================================================================
+app.get('/api/runs', (req, res) => {
+  const clusterId = req.query.clusterId ? String(req.query.clusterId) : undefined;
+  res.json({
+    activeRun: runnerEngine.getActiveRun(),
+    runs: storageRepo.listTestRuns(clusterId),
+  });
+});
+
+app.post('/api/runs/start', async (req, res) => {
+  try {
+    const { scenarioId } = req.body as { scenarioId: string };
+    const scenario = storageRepo.getScenario(scenarioId);
+    if (!scenario) {
+      res.status(404).json({ error: 'Không tìm thấy kịch bản kiểm thử' });
+      return;
+    }
+    const cluster = storageRepo.getClusterInternal(scenario.clusterId);
+    if (!cluster) {
+      res.status(404).json({ error: 'Không tìm thấy cụm máy chủ của kịch bản này' });
+      return;
+    }
+
+    const run = await runnerEngine.startScenarioRun(cluster, scenario);
+    res.json({ run });
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : 'Không thể bắt đầu chạy kịch bản',
+    });
+  }
+});
+
+app.post('/api/runs/stop', (_req, res) => {
+  const run = runnerEngine.stopActiveRun();
+  res.json({ run });
+});
+
+const PORT = Number(process.env.PORT) || 3335;
+server.listen(PORT, '127.0.0.1', () => {
   console.log(
-    `[KubePulse Backend] Listening on http://localhost:${PORT} (WS: ws://localhost:${PORT}/ws/studio)`
+    `[KubePulse Backend] Listening on http://127.0.0.1:${PORT} (WS: ws://127.0.0.1:${PORT}/ws/studio)`
   );
 });

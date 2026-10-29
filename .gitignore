@@ -7,13 +7,18 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment & Secrets
+# Environment & Secrets & Local Database
 .env
 .env.*
 !.env.example
 *.kubeconfig
 kubeconfig*.yaml
 kubeconfig*.yml
+k3s.yaml
+backend/data/
+*.db
+*.sqlite
+*.sqlite3
 
 # Logs & OS files
 logs/
