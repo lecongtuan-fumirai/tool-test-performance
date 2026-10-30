@@ -254,20 +254,29 @@ export function App() {
     await fetchInitialData();
   };
 
+  const [startingRun, setStartingRun] = useState(false);
+
   const handleRunScenarioAndProceed = async (scenarioId: string) => {
     setErrorBanner(null);
-    const res = await fetch('/api/runs/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scenarioId }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setErrorBanner(data.error || 'Không thể khởi chạy kịch bản');
-      return;
+    setStartingRun(true);
+    try {
+      const res = await fetch('/api/runs/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenarioId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorBanner(data.error || 'Không thể khởi chạy kịch bản');
+        return;
+      }
+      setActiveRun(data.run);
+      // Small pause so the user visually sees the high-tech transition to Step 4
+      await new Promise((r) => setTimeout(r, 650));
+      setCurrentStep(4);
+    } finally {
+      setStartingRun(false);
     }
-    setActiveRun(data.run);
-    setCurrentStep(4);
   };
 
   const handleStopRun = async () => {
@@ -485,6 +494,25 @@ export function App() {
           />
         )}
       </main>
+
+      {/* Loading Overlay when starting and transitioning to Step 4 */}
+      {startingRun && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-4 animate-in fade-in duration-200">
+          <div className="relative flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin" />
+            <Activity className="w-7 h-7 text-cyan-400 absolute animate-pulse" />
+          </div>
+          <div className="text-center space-y-1.5 max-w-sm">
+            <div className="text-sm font-bold text-white tracking-wide uppercase flex items-center justify-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              Đang Khởi Chạy Tải & Chuyển Sang Bước 4...
+            </div>
+            <p className="text-xs text-slate-400 font-mono">
+              Đang kết nối Telemetry K8s Pod, khởi tạo cụm Worker và mở WebSocket Stream...
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

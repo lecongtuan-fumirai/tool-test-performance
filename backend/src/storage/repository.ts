@@ -524,21 +524,25 @@ export class StorageRepository {
       })
     );
 
-    // 12. OOM Crash Test — Ép Tràn RAM Đột Ngột (Gây chết Pod OOMKilled thật)
+    const wsRoute = snapshot.ingresses.find((r) => r.protocol === 'WSS');
+    const wsBaseUrl = wsRoute
+      ? `${wsRoute.tlsEnabled ? 'wss' : 'ws'}://${wsRoute.host}`
+      : baseUrl.replace(/^http/, 'ws');
+    const wsPath = wsRoute?.path || '/ws';
+
+    // 12. OOM Crash Test — Ép Tràn RAM Đột Ngột (Gây chết Pod OOMKilled thật qua WebSocket Buffer Flood)
     created.push(
       this.saveScenario({
         clusterId: cluster.id,
-        name: `[12. OOM Crash Test] Ép Tràn RAM Đột Ngột (OOMKilled Injection)`,
-        description: `Bắn đồng loạt các payload JSON cấu trúc lồng nhau cực lớn (1024KB/req) với 50-100 VUs trực tiếp vào máy chủ để ép bộ nhớ V8 Heap/Buffer tăng vọt, kích hoạt bộ quét K8s OOMKilled (Exit Code 137) hiển thị báo đỏ trên cả UI và Grafana.`,
+        name: `[12. OOM Crash Test] Ép Tràn RAM WebSocket Buffer (WSS 64KB Flood)`,
+        description: `Mở 50-100 kết nối WebSocket trực tiếp vào ${wsPath} và bơm liên tục các frame nhị phân 64KB mỗi 60ms để làm nghẽn Event Loop và tràn bộ đệm RAM của Pod (Exit Code 137).`,
         testType: 'VOLUME_TEST',
-        protocol: 'HTTP',
-        method: 'POST',
-        targetBaseUrl: baseUrl,
-        targetPath: `${dataPath}${dataPath.includes('?') ? '&' : '?'}oom_spike_test=true`,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        volumePayloadKb: 1024,
+        protocol: 'WEBSOCKET',
+        method: 'GET',
+        targetBaseUrl: wsBaseUrl,
+        targetPath: wsPath,
+        headers: {},
+        volumePayloadKb: 64,
         virtualUsers: 50,
         peakVirtualUsers: 100,
         durationSeconds: 30,

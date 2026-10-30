@@ -626,7 +626,26 @@ export class RealRunnerEngine {
               ws.send(initPayload);
             } catch {}
 
-            // 2. Active Application Message Pump (Every 250ms): Forces Node.js Event Loop to parse & process real data
+            // 2. Active Application Message Pump: Forces Node.js Event Loop & Socket Buffers to process real data
+            const isOomOrVolume =
+              scenario.testType === 'VOLUME_TEST' ||
+              (scenario.volumePayloadKb && scenario.volumePayloadKb > 0) ||
+              scenario.name.includes('OOM');
+
+            const pumpIntervalMs = isOomOrVolume ? 60 : 250;
+            const payloadKb = scenario.volumePayloadKb || (isOomOrVolume ? 64 : 1);
+            const heavyPayload = isOomOrVolume
+              ? JSON.stringify({
+                  event: 'heavy_data_stream_buffer_injection',
+                  workerId: workerIdx,
+                  seq: Math.floor(Math.random() * 100000),
+                  clientTs: Date.now(),
+                  blob: 'OOM_WS_STREAM_BLOB_0123456789_'.repeat(
+                    Math.max(1, Math.floor((payloadKb * 1024) / 30))
+                  ),
+                })
+              : null;
+
             const pumpTimer = setInterval(() => {
               if (
                 signal.aborted ||
@@ -642,12 +661,14 @@ export class RealRunnerEngine {
               }
 
               const sentTs = performance.now();
-              const msgPayload = JSON.stringify({
-                event: 'heartbeat_data_stream',
-                workerId: workerIdx,
-                seq: Math.floor(Math.random() * 100000),
-                clientTs: Date.now(),
-              });
+              const msgPayload =
+                heavyPayload ||
+                JSON.stringify({
+                  event: 'heartbeat_data_stream',
+                  workerId: workerIdx,
+                  seq: Math.floor(Math.random() * 100000),
+                  clientTs: Date.now(),
+                });
 
               try {
                 ws.send(msgPayload, (err) => {
@@ -659,7 +680,7 @@ export class RealRunnerEngine {
               } catch {
                 onSample(100, 'err');
               }
-            }, 300);
+            }, pumpIntervalMs);
 
             // Listen for server incoming messages to record round-trip response
             ws.on('message', () => {
