@@ -3,6 +3,7 @@ import cors from 'cors';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { storageRepo } from './storage/repository.js';
 import { k8sDiscoveryService } from './services/k8sDiscoveryService.js';
@@ -258,22 +259,75 @@ app.post('/api/runs/stop', (_req, res) => {
 });
 
 // Serve frontend static build if available (supports single Web Service deployment on Render/Docker)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const possibleFrontendPaths = [
+  path.resolve(__dirname, '../public'),
+  path.resolve(__dirname, 'public'),
+  path.resolve(process.cwd(), 'backend/public'),
+  path.resolve(process.cwd(), 'public'),
   path.resolve(process.cwd(), '../frontend/dist'),
   path.resolve(process.cwd(), 'frontend/dist'),
-  path.resolve(process.cwd(), 'public'),
+  path.resolve(__dirname, '../../frontend/dist'),
 ];
+
+let frontendDistPath: string | null = null;
 for (const p of possibleFrontendPaths) {
-  if (fs.existsSync(p)) {
-    app.use(express.static(p));
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
-        return next();
-      }
-      res.sendFile(path.join(p, 'index.html'));
-    });
+  if (fs.existsSync(path.join(p, 'index.html'))) {
+    frontendDistPath = p;
     break;
   }
+}
+
+if (frontendDistPath) {
+  console.log(`[KubePulse] Serving Frontend UI from: ${frontendDistPath}`);
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath!, 'index.html'));
+  });
+} else {
+  console.warn(
+    `[KubePulse Warning] Could not find frontend index.html in any of:\n` +
+      possibleFrontendPaths.map((p) => `  - ${p}`).join('\n')
+  );
+  app.get('/', (_req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>KubePulse Backend Online</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; background: #030712; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+            .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; max-width: 580px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+            h1 { color: #38bdf8; margin-top: 0; font-size: 22px; }
+            p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+            code { background: #1e293b; color: #f43f5e; padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: monospace; }
+            .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; font-size: 12px; font-weight: bold; margin-bottom: 16px; }
+            ol { color: #cbd5e1; font-size: 13px; padding-left: 20px; line-height: 1.7; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="badge">● Backend API & WebSocket Online</div>
+            <h1>KubePulse Backend Đang Hoạt Động!</h1>
+            <p>Máy chủ Backend đã chạy bình thường, nhưng chưa tìm thấy thư mục build <code>frontend/dist</code>.</p>
+            <p><strong>Cách khắc phục trên Render:</strong></p>
+            <ol>
+              <li>Kiểm tra <strong>Build Command</strong> trên Render: Phải là <code>pnpm install && pnpm run build</code></li>
+              <li>Kiểm tra <strong>Root Directory</strong> trên Render: Để <strong>trống</strong> (không điền <code>backend</code>) để Render build đầy đủ cả Frontend và Backend.</li>
+            </ol>
+            <p style="margin-top: 20px; font-size: 12px; color: #64748b;">API Health: <a href="/api/clusters" style="color: #38bdf8;">/api/clusters</a> | WebSocket: <code>/ws/studio</code></p>
+          </div>
+        </body>
+      </html>
+    `);
+  });
 }
 
 const PORT = Number(process.env.PORT) || 3335;
