@@ -14,6 +14,7 @@ import {
   ClusterConnectionPublic,
   DiscoveredIngressRoute,
   NamespaceTopologySnapshot,
+  ScenarioProtocol,
   TestScenario,
   TestRunRecord,
 } from './types';
@@ -248,11 +249,15 @@ export function App() {
     workloadName?: string
   ) => {
     if (!selectedCluster) return;
-    const protocol = route.protocol === 'WSS' ? 'WEBSOCKET' : 'HTTP';
+    const isWs = route.protocol === 'WSS' || route.path === '/ws' || route.path.startsWith('/ws/');
+    const protocol: ScenarioProtocol = isWs ? 'WEBSOCKET' : 'HTTP';
+    const scheme = isWs ? (route.tlsEnabled ? 'wss' : 'ws') : (route.tlsEnabled ? 'https' : 'http');
     const baseUrl =
       route.host && route.host !== '*'
-        ? `${route.tlsEnabled ? 'https' : 'http'}://${route.host}`
-        : selectedCluster.externalBaseUrl || 'https://localhost';
+        ? `${scheme}://${route.host}`
+        : selectedCluster.externalBaseUrl
+          ? (isWs ? selectedCluster.externalBaseUrl.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:') : selectedCluster.externalBaseUrl)
+          : `${scheme}://localhost`;
 
     await navigateToStep(3, async () => {
       const saved = await handleSaveScenario({
