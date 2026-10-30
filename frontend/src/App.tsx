@@ -81,7 +81,13 @@ export function App() {
   // WebSocket live stream for active test runs
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/studio`;
+    const defaultWsUrl = `${protocol}//${window.location.host}/ws/studio`;
+    const configuredApiBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+    const wsUrl =
+      import.meta.env.VITE_WS_URL ||
+      (configuredApiBase
+        ? configuredApiBase.replace(/^https?:\/\//, protocol === 'wss:' ? 'wss://' : 'ws://') + '/ws/studio'
+        : defaultWsUrl);
     let ws: WebSocket | null = null;
     let reconnectTimer: number | null = null;
 
