@@ -1112,58 +1112,6 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
       {/* 5. MAIN EVALUATION & DETAILED RESULTS TABS */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-5">
         <div className="lg:col-span-8 space-y-3">
-          {/* TAB 1: EXECUTIVE SUMMARY */}
-          {activeTab === 'SUMMARY' && (
-            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 pb-3.5 border-b border-slate-800">
-                <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 ${currentRun.evaluation.grade.startsWith('A')
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : currentRun.evaluation.grade === 'B'
-                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                      : currentRun.evaluation.grade === 'C'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                    }`}
-                >
-                  {currentRun.evaluation.grade}
-                </div>
-                <div className="space-y-1">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                    Kết luận Đánh giá Tự động từ Số liệu Thực tế
-                  </div>
-                  <h3 className="text-sm font-bold text-white">
-                    {currentRun.evaluation.headlineVi}
-                  </h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    {currentRun.evaluation.nonTechSummaryVi}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs font-mono text-indigo-300">
-                {currentRun.evaluation.engineerSummary}
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Khuyến nghị Hành động
-                </h4>
-                <ul className="space-y-1.5">
-                  {currentRun.evaluation.recommendationsVi.map((rec, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-200"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
-                      <span>{rec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
           {/* TAB 2: TECHNICAL TIMELINE & K8S LOGS */}
           {activeTab === 'TECHNICAL' && (
             <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
@@ -1264,54 +1212,6 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* TAB 3: REAL SECURITY AUDIT FINDINGS */}
-          {activeTab === 'SECURITY' && (
-            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2.5">
-              {currentRun.securityFindings.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  Kịch bản này chỉ chạy bắn tải thuần túy hoặc đang thu thập kết quả kiểm toán bảo mật...
-                </div>
-              ) : (
-                currentRun.securityFindings.map((finding) => (
-                  <div
-                    key={finding.id}
-                    className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start gap-2.5"
-                  >
-                    {finding.status === 'PASS' ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    ) : finding.status === 'WARN' ? (
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                    )}
-                    <div className="space-y-1 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-white">{finding.titleVi}</span>
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${finding.status === 'PASS'
-                            ? 'bg-emerald-500/20 text-emerald-300'
-                            : finding.status === 'WARN'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-rose-500/20 text-rose-300'
-                            }`}
-                        >
-                          {finding.category} • {finding.status}
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-mono text-slate-400">
-                        {finding.technicalCheck} → {finding.observedResult}
-                      </p>
-                      <p className="text-xs text-slate-300">{finding.nonTechExplanationVi}</p>
-                      <p className="text-[11px] text-indigo-300">
-                        <strong>Khuyến nghị:</strong> {finding.remediationVi}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           )}
         </div>
