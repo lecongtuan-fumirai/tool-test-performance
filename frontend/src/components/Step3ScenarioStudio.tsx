@@ -5,16 +5,19 @@ import {
   Save,
   Trash2,
   Sliders,
-  ShieldAlert,
   Sparkles,
   Check,
   Activity,
   Flame,
   Zap,
-  Clock,
-  TrendingUp,
+  Globe,
+  Cpu,
+  Layers,
   Database,
-  ShieldCheck,
+  ArrowRight,
+  Shield,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   ClusterConnectionPublic,
@@ -39,121 +42,53 @@ interface Step3ScenarioStudioProps {
   onRunScenarioAndProceed: (scenarioId: string) => Promise<void>;
 }
 
-const TEST_TYPE_CATALOG: Array<{
+export const TEST_TYPE_CATALOG: Array<{
   type: PerformanceTestType;
-  group: 'PERFORMANCE' | 'SECURITY';
-  automation?: 'Có' | 'Một phần';
   title: string;
+  badgeLabel: string;
+  subtitle: string;
   purpose: string;
-  example: string;
-  badgeColor: string;
+  flowDescription: string;
+  accentBorder: string;
+  activeBg: string;
+  textColor: string;
   icon: React.ReactNode;
 }> = [
-  // === 6 PERFORMANCE TESTING TYPES ===
   {
     type: 'LOAD_TEST',
-    group: 'PERFORMANCE',
-    title: '1. Load Testing',
-    purpose: 'Kiểm tra hệ thống với tải dự kiến',
-    example: 'VD: 1.000 users truy cập cùng lúc',
-    badgeColor: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300',
+    title: '1. Load Test',
+    badgeLabel: 'Baseline SLA',
+    subtitle: 'Tải Ổn định Dự kiến',
+    purpose: 'Kiểm tra hoạt động ở tải mục tiêu, đối chiếu SLA p95 Latency và RAM/CPU Pod.',
+    flowDescription: 'Bơm dòng traffic đều đặn qua Ingress vào Pod. Đo lường SLA cam kết dưới tải thông thường.',
+    accentBorder: 'border-cyan-500',
+    activeBg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/50',
+    textColor: 'text-cyan-400',
     icon: <Activity className="w-4 h-4 text-cyan-400" />,
   },
   {
     type: 'STRESS_TEST',
-    group: 'PERFORMANCE',
-    title: '2. Stress Testing',
-    purpose: 'Tăng tải vượt giới hạn để tìm điểm gãy',
-    example: 'VD: Tăng bậc thang từ 1.000 lên 10.000 users',
-    badgeColor: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
+    title: '2. Stress Test',
+    badgeLabel: 'Breaking Point',
+    subtitle: 'Tìm Điểm Gãy Bậc Thang',
+    purpose: 'Tăng tải 5 nấc liên tục vượt ngưỡng để tìm chính xác điểm gãy (429, 5xx, hoặc OOM).',
+    flowDescription: 'Leo bậc thang 5 nấc ép tải. Kiểm tra xem Cloudflare/Traefik cắt 429 hay Pod bị cạn CPU/RAM trước.',
+    accentBorder: 'border-rose-500',
+    activeBg: 'bg-rose-500/15 text-rose-300 border-rose-500/50',
+    textColor: 'text-rose-400',
     icon: <Flame className="w-4 h-4 text-rose-400" />,
   },
   {
     type: 'SPIKE_TEST',
-    group: 'PERFORMANCE',
-    title: '3. Spike Testing',
-    purpose: 'Kiểm tra khi tải tăng hoặc giảm đột ngột',
-    example: 'VD: Traffic tăng 10 lần trong 1 phút',
-    badgeColor: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+    title: '3. Spike Test',
+    badgeLabel: '10x Flash Sale',
+    subtitle: 'Sốc Tải & Đo Hồi Phục',
+    purpose: 'Tải nền thấp đột ngột vọt 10x tức thì rồi hạ để đo Thời gian tự phục hồi (Recovery Time).',
+    flowDescription: 'Bơm xung tải tức thì 10x (Flash Sale) rồi ngắt đột ngột để kiểm tra xả nghẽn hàng đợi và tự phục hồi.',
+    accentBorder: 'border-amber-500',
+    activeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/50',
+    textColor: 'text-amber-400',
     icon: <Zap className="w-4 h-4 text-amber-400" />,
-  },
-  {
-    type: 'SOAK_ENDURANCE_TEST',
-    group: 'PERFORMANCE',
-    title: '4. Endurance / Soak Testing',
-    purpose: 'Kiểm tra hệ thống khi chịu tải lâu dài',
-    example: 'VD: 500 users chạy liên tục nhiều giờ (Dò Memory Leak)',
-    badgeColor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-    icon: <Clock className="w-4 h-4 text-emerald-400" />,
-  },
-  {
-    type: 'SCALABILITY_TEST',
-    group: 'PERFORMANCE',
-    title: '5. Scalability Testing',
-    purpose: 'Kiểm tra khả năng mở rộng khi tăng tài nguyên',
-    example: 'VD: Tăng số Pod từ 2 lên 10 & đo RPS/Pod',
-    badgeColor: 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300',
-    icon: <TrendingUp className="w-4 h-4 text-indigo-400" />,
-  },
-  {
-    type: 'VOLUME_TEST',
-    group: 'PERFORMANCE',
-    title: '6. Volume Testing',
-    purpose: 'Kiểm tra khi dữ liệu có khối lượng lớn',
-    example: 'VD: Payload lớn (64KB–512KB) / Truy vấn bản ghi lớn',
-    badgeColor: 'border-purple-500/40 bg-purple-500/10 text-purple-300',
-    icon: <Database className="w-4 h-4 text-purple-400" />,
-  },
-  // === 5 SECURITY TESTING TYPES ===
-  {
-    type: 'SECURITY_DAST',
-    group: 'SECURITY',
-    automation: 'Có',
-    title: '7. DAST (Dynamic App Security)',
-    purpose: 'Phát hiện một số lỗ hổng web khi chạy',
-    example: 'Tự động: Có • Quét XSS/SQLi reflection, Security Headers',
-    badgeColor: 'border-teal-500/40 bg-teal-500/10 text-teal-300',
-    icon: <ShieldCheck className="w-4 h-4 text-teal-400" />,
-  },
-  {
-    type: 'SECURITY_API',
-    group: 'SECURITY',
-    automation: 'Một phần',
-    title: '8. API Security',
-    purpose: 'Kiểm tra input, quyền và hành vi API',
-    example: 'Tự động: Một phần • Kiểm tra Malformed JSON, CORS, Rate Limit',
-    badgeColor: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
-    icon: <ShieldCheck className="w-4 h-4 text-sky-400" />,
-  },
-  {
-    type: 'SECURITY_AUTH',
-    group: 'SECURITY',
-    automation: 'Một phần',
-    title: '9. Authentication / Authorization',
-    purpose: 'Xác minh các vai trò và quyền truy cập',
-    example: 'Tự động: Một phần • Thử Token giả mạo (alg:none), kiểm tra RBAC/BOLA',
-    badgeColor: 'border-violet-500/40 bg-violet-500/10 text-violet-300',
-    icon: <ShieldAlert className="w-4 h-4 text-violet-400" />,
-  },
-  {
-    type: 'SECURITY_INFRA',
-    group: 'SECURITY',
-    automation: 'Có',
-    title: '10. Infrastructure Scan',
-    purpose: 'Phát hiện cấu hình không an toàn',
-    example: 'Tự động: Có • Kiểm toán K8s NetworkPolicy, Pod SecurityContext, TLS',
-    badgeColor: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-    icon: <ShieldCheck className="w-4 h-4 text-emerald-400" />,
-  },
-  {
-    type: 'SECURITY_PENTEST',
-    group: 'SECURITY',
-    automation: 'Một phần',
-    title: '11. Pentest (Exploit Chain)',
-    purpose: 'Phát hiện chuỗi khai thác và lỗi logic phức tạp',
-    example: 'Tự động: Một phần • Mô phỏng chuỗi Recon -> Path Traversal & Log Pod',
-    badgeColor: 'border-orange-500/40 bg-orange-500/10 text-orange-300',
-    icon: <ShieldAlert className="w-4 h-4 text-orange-400" />,
   },
 ];
 
@@ -178,20 +113,19 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
   const [protocol, setProtocol] = useState<ScenarioProtocol>('HTTP');
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('GET');
   const [targetBaseUrl, setTargetBaseUrl] = useState('');
-  const [targetPath, setTargetPath] = useState('/healthz');
+  const [targetPath, setTargetPath] = useState('/');
   const [authHeader, setAuthHeader] = useState('');
   const [requestBody, setRequestBody] = useState('');
   const [virtualUsers, setVirtualUsers] = useState(50);
-  const [peakVirtualUsers, setPeakVirtualUsers] = useState(200);
-  const [volumePayloadKb, setVolumePayloadKb] = useState(64);
-  const [targetPodReplicas, setTargetPodReplicas] = useState(6);
-  const [durationSeconds, setDurationSeconds] = useState(20);
+  const [peakVirtualUsers, setPeakVirtualUsers] = useState(250);
+  const [durationSeconds, setDurationSeconds] = useState(25);
   const [rampUpSeconds, setRampUpSeconds] = useState(5);
   const [targetNamespace, setTargetNamespace] = useState(selectedNamespace);
   const [targetWorkload, setTargetWorkload] = useState('');
   const [safetyAbortMemoryPercent, setSafetyAbortMemoryPercent] = useState(85);
   const [savedToast, setSavedToast] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Sync form when activeScenario changes
   useEffect(() => {
@@ -199,22 +133,21 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
       setId(activeScenario.id);
       setName(activeScenario.name);
       setDescription(activeScenario.description);
-      setTestType(
-        activeScenario.testType ||
-          (activeScenario.protocol === 'SECURITY_AUDIT' ? 'SECURITY_AUDIT' : 'LOAD_TEST')
-      );
+      const normalizedType: PerformanceTestType =
+        activeScenario.testType === 'STRESS_TEST' || activeScenario.testType === 'SPIKE_TEST'
+          ? activeScenario.testType
+          : 'LOAD_TEST';
+      setTestType(normalizedType);
       setProtocol(activeScenario.protocol);
       setMethod(activeScenario.method);
       setTargetBaseUrl(activeScenario.targetBaseUrl);
       setTargetPath(activeScenario.targetPath);
       setAuthHeader(activeScenario.headers?.['Authorization'] || '');
       setRequestBody(activeScenario.requestBody || '');
-      setVirtualUsers(activeScenario.virtualUsers);
-      setPeakVirtualUsers(activeScenario.peakVirtualUsers || activeScenario.virtualUsers * 4);
-      setVolumePayloadKb(activeScenario.volumePayloadKb || 64);
-      setTargetPodReplicas(activeScenario.targetPodReplicas || 6);
-      setDurationSeconds(activeScenario.durationSeconds);
-      setRampUpSeconds(activeScenario.rampUpSeconds);
+      setVirtualUsers(activeScenario.virtualUsers || 50);
+      setPeakVirtualUsers(activeScenario.peakVirtualUsers || 250);
+      setDurationSeconds(activeScenario.durationSeconds || 25);
+      setRampUpSeconds(activeScenario.rampUpSeconds || 5);
       setTargetNamespace(activeScenario.targetNamespace || selectedNamespace);
       setTargetWorkload(
         activeScenario.targetWorkload || topology?.workloads[0]?.name || ''
@@ -226,26 +159,27 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
   }, [activeScenario?.id]);
 
   const handleInitNewBlankScenario = () => {
+    const wsRoute = topology?.ingresses.find((r) => r.protocol === 'WSS');
     const firstIng = topology?.ingresses[0];
-    const defaultUrl = firstIng
+    const defaultUrl = wsRoute
+      ? `${wsRoute.tlsEnabled ? 'wss' : 'ws'}://${wsRoute.host}`
+      : firstIng
       ? `${firstIng.tlsEnabled ? 'https' : 'http'}://${firstIng.host}`
       : cluster.externalBaseUrl || 'https://localhost';
 
     setId(undefined);
-    setName(`[1. Load Testing] Kiểm thử Tải Dự kiến (${selectedNamespace})`);
-    setDescription('Kiểm tra hệ thống với tải dự kiến và đối chiếu RAM/CPU thực tế trên K8s');
+    setName(`[1. Load Test] Tải Chuẩn SLA (${selectedNamespace})`);
+    setDescription('Kiểm tra tải ổn định đối chiếu SLA và CPU/RAM Pod K8s');
     setTestType('LOAD_TEST');
-    setProtocol('HTTP');
+    setProtocol(wsRoute ? 'WEBSOCKET' : 'HTTP');
     setMethod('GET');
     setTargetBaseUrl(defaultUrl);
-    setTargetPath(firstIng?.path || '/healthz');
+    setTargetPath(wsRoute ? wsRoute.path : firstIng?.path || '/healthz');
     setAuthHeader('');
     setRequestBody('');
     setVirtualUsers(50);
-    setPeakVirtualUsers(250);
-    setVolumePayloadKb(64);
-    setTargetPodReplicas(6);
-    setDurationSeconds(20);
+    setPeakVirtualUsers(50);
+    setDurationSeconds(25);
     setRampUpSeconds(5);
     setTargetNamespace(selectedNamespace);
     setTargetWorkload(topology?.workloads[0]?.name || '');
@@ -256,54 +190,25 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
     setTestType(selectedType);
     const meta = TEST_TYPE_CATALOG.find((c) => c.type === selectedType);
     if (meta) {
-      setName(`[${meta.title}] ${meta.purpose} (${targetPath})`);
-      setDescription(`${meta.purpose} — ${meta.example}`);
+      setName(`[${meta.title}] ${meta.subtitle} (${targetPath})`);
+      setDescription(meta.purpose);
     }
 
-    if (selectedType.startsWith('SECURITY_')) {
-      setProtocol('SECURITY_AUDIT');
-      setVirtualUsers(selectedType === 'SECURITY_PENTEST' ? 10 : 5);
-      setDurationSeconds(selectedType === 'SECURITY_PENTEST' ? 15 : 10);
-      if (selectedType === 'SECURITY_API') {
-        setMethod('POST');
-      } else {
-        setMethod('GET');
-      }
-    } else {
-      if (protocol === 'SECURITY_AUDIT') setProtocol('HTTP');
-      if (selectedType === 'LOAD_TEST') {
-        setVirtualUsers(50);
-        setPeakVirtualUsers(50);
-        setDurationSeconds(20);
-        setRampUpSeconds(5);
-      } else if (selectedType === 'STRESS_TEST') {
-        setVirtualUsers(30);
-        setPeakVirtualUsers(300);
-        setDurationSeconds(30);
-        setRampUpSeconds(5);
-      } else if (selectedType === 'SPIKE_TEST') {
-        setVirtualUsers(20);
-        setPeakVirtualUsers(200);
-        setDurationSeconds(25);
-        setRampUpSeconds(2);
-      } else if (selectedType === 'SOAK_ENDURANCE_TEST') {
-        setVirtualUsers(40);
-        setPeakVirtualUsers(40);
-        setDurationSeconds(90);
-        setRampUpSeconds(10);
-      } else if (selectedType === 'SCALABILITY_TEST') {
-        setVirtualUsers(50);
-        setPeakVirtualUsers(150);
-        setTargetPodReplicas(8);
-        setDurationSeconds(25);
-        setRampUpSeconds(5);
-      } else if (selectedType === 'VOLUME_TEST') {
-        setMethod('POST');
-        setVolumePayloadKb(64);
-        setVirtualUsers(25);
-        setDurationSeconds(20);
-        setRampUpSeconds(4);
-      }
+    if (selectedType === 'LOAD_TEST') {
+      setVirtualUsers(50);
+      setPeakVirtualUsers(50);
+      setDurationSeconds(25);
+      setRampUpSeconds(5);
+    } else if (selectedType === 'STRESS_TEST') {
+      setVirtualUsers(30);
+      setPeakVirtualUsers(300);
+      setDurationSeconds(30);
+      setRampUpSeconds(5);
+    } else if (selectedType === 'SPIKE_TEST') {
+      setVirtualUsers(20);
+      setPeakVirtualUsers(200);
+      setDurationSeconds(25);
+      setRampUpSeconds(2);
     }
   };
 
@@ -311,9 +216,6 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
     const headers: Record<string, string> = {};
     if (authHeader.trim()) {
       headers['Authorization'] = authHeader.trim();
-    }
-    if (testType === 'VOLUME_TEST' && (method === 'POST' || method === 'PUT')) {
-      headers['Content-Type'] = 'application/json';
     }
     return {
       id,
@@ -329,9 +231,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
       requestBody: requestBody.trim() || undefined,
       virtualUsers: Number(virtualUsers) || 10,
       peakVirtualUsers: Number(peakVirtualUsers) || Number(virtualUsers) || 10,
-      volumePayloadKb: Number(volumePayloadKb) || 64,
-      targetPodReplicas: Number(targetPodReplicas) || 4,
-      durationSeconds: Number(durationSeconds) || 15,
+      durationSeconds: Number(durationSeconds) || 25,
       rampUpSeconds: Number(rampUpSeconds) || 3,
       targetNamespace: targetNamespace || selectedNamespace,
       targetWorkload: targetWorkload || undefined,
@@ -363,57 +263,56 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
     }
   };
 
-  const showPeakSlider =
-    testType === 'STRESS_TEST' ||
-    testType === 'SPIKE_TEST' ||
-    testType === 'SCALABILITY_TEST';
+  const showPeak = testType === 'STRESS_TEST' || testType === 'SPIKE_TEST';
+  const activeMeta = TEST_TYPE_CATALOG.find((c) => c.type === testType) || TEST_TYPE_CATALOG[0];
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* LEFT 4 COLS: SAVED SCENARIO LIST */}
-      <div className="lg:col-span-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      {/* LEFT 4 COLS: SCENARIO LIST (COMPACT, FIXED SCROLL CONTAINER) */}
+      <div className="lg:col-span-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
           <div>
-            <h2 className="text-sm font-bold text-white">
-              Bộ Kịch bản ({scenarios.length})
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+              Kịch bản ({scenarios.length})
             </h2>
-            <p className="text-[11px] text-slate-400">Cụm: {cluster.name}</p>
+            <p className="text-[10px] text-slate-400 font-mono truncate max-w-[140px]">
+              {selectedNamespace}
+            </p>
           </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={onAutoGenerateScenarios}
-              className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 flex items-center gap-1"
-              title="Tự động tạo đủ 6 loại Performance Test + 5 loại Security Test + OOM Crash Test từ hạ tầng K8s"
+              className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 flex items-center gap-1"
+              title="Sinh bộ 3 kịch bản: Load, Stress, Spike"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Sinh Đủ 12 Kịch Bản (Gồm OOM)
+              <Sparkles className="w-3 h-3" /> Bộ 3 Kịch bản
             </button>
             <button
               type="button"
               onClick={handleInitNewBlankScenario}
-              className="rounded-lg bg-cyan-500 px-2.5 py-1.5 text-[11px] font-bold text-slate-950 hover:bg-cyan-400 flex items-center gap-1"
+              className="rounded-lg bg-cyan-500 px-2 py-1 text-[11px] font-bold text-slate-950 hover:bg-cyan-400 flex items-center gap-1"
             >
-              <Plus className="w-3.5 h-3.5" /> Tạo mới
+              <Plus className="w-3 h-3" /> Mới
             </button>
           </div>
         </div>
 
         {scenarios.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center space-y-3">
-            <p className="text-xs text-slate-400">
-              Chưa có kịch bản nào cho cụm này. Hãy bấm nút bên dưới để tự động tạo đủ 6 loại Performance Test chuẩn (Load, Stress, Spike, Soak, Scalability, Volume) + Security Audit!
+          <div className="rounded-xl border border-dashed border-slate-800 p-5 text-center space-y-2.5">
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Chưa có kịch bản nào. Bấm nút dưới để tạo tự động bộ 3 kịch bản chuẩn!
             </p>
             <button
               type="button"
               onClick={onAutoGenerateScenarios}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/30"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/30"
             >
-              <Sparkles className="w-4 h-4" />
-              Sinh Bộ 7 Kịch bản Chuẩn cho {selectedNamespace}
+              <Sparkles className="w-3.5 h-3.5" /> Tạo Bộ 3 Kịch bản
             </button>
           </div>
         ) : (
-          <div className="space-y-2 max-h-[68vh] overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-[calc(100vh-230px)] overflow-y-auto pr-1">
             {scenarios.map((scen) => {
               const selected = scen.id === id;
               const sType = scen.testType || 'LOAD_TEST';
@@ -423,46 +322,36 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
                 <div
                   key={scen.id}
                   onClick={() => onSelectScenario(scen.id)}
-                  className={`cursor-pointer rounded-xl border p-3.5 transition ${
+                  className={`cursor-pointer rounded-xl border p-2.5 transition flex flex-col gap-1 ${
                     selected
-                      ? 'border-cyan-400 bg-cyan-950/30 shadow'
-                      : 'border-slate-800 bg-slate-950/70 hover:border-slate-700'
+                      ? 'border-cyan-400 bg-cyan-950/40 shadow-sm'
+                      : 'border-slate-800/80 bg-slate-950/60 hover:border-slate-700'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-white leading-snug">
-                        {scen.name}
-                      </span>
-                      {scen.name.includes('OOM') && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse">
-                          🔥 OOM CRASH
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs font-semibold text-white truncate">
+                      {scen.name}
+                    </span>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeleteScenario(scen.id);
                       }}
-                      className="text-slate-500 hover:text-rose-400 p-0.5"
+                      className="text-slate-500 hover:text-rose-400 p-0.5 shrink-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-400 line-clamp-1 mt-1">
-                    {scen.description}
-                  </p>
-                  <div className="mt-2 flex items-center justify-between text-[10px] font-mono">
-                    <span className={`rounded border px-1.5 py-0.5 ${meta.badgeColor}`}>
-                      {sType} (
+                  <div className="flex items-center justify-between text-[10px] font-mono">
+                    <span className={`px-1.5 py-0.2 rounded border ${meta.activeBg}`}>
+                      {sType === 'LOAD_TEST' ? 'LOAD' : sType === 'STRESS_TEST' ? 'STRESS' : 'SPIKE'} (
                       {scen.peakVirtualUsers && scen.peakVirtualUsers > scen.virtualUsers
-                        ? `${scen.virtualUsers}→${scen.peakVirtualUsers} VU`
-                        : `${scen.virtualUsers} VU`}{' '}
-                      / {scen.durationSeconds}s)
+                        ? `${scen.virtualUsers}→${scen.peakVirtualUsers}`
+                        : scen.virtualUsers}{' '}
+                      VUs)
                     </span>
-                    <span className="text-slate-400 truncate max-w-[110px]">
+                    <span className="text-slate-400 truncate max-w-[120px]">
                       {scen.targetPath}
                     </span>
                   </div>
@@ -473,21 +362,20 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
         )}
       </div>
 
-      {/* RIGHT 8 COLS: DYNAMIC SCENARIO CONFIG FORM */}
+      {/* RIGHT 8 COLS: MINIMALIST SCENARIO STUDIO (ZERO SCROLL FIT) */}
       <form
         onSubmit={handleSaveOnly}
-        className="lg:col-span-8 rounded-2xl border border-slate-800 bg-slate-900/75 p-6 space-y-5"
+        className="lg:col-span-8 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3.5"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-2.5">
-            <Sliders className="w-5 h-5 text-cyan-400" />
-            <div>
-              <h2 className="text-base font-bold text-white">
-                Bước 3: Chọn Loại Kiểm thử & Thiết kế Kịch bản Động
-              </h2>
-              <p className="text-xs text-slate-400">
-                Hỗ trợ đầy đủ 6 loại Kiểm thử Hiệu năng chuẩn (Load, Stress, Spike, Soak, Scalability, Volume) & Kiểm toán Bảo mật.
-              </p>
+        {/* COMPACT TOP ACTION BAR */}
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-cyan-400 shrink-0" />
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-white">Thiết Kế Kịch Bản Kiểm Thử</h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                {protocol}
+              </span>
             </div>
           </div>
 
@@ -495,15 +383,15 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
             <button
               type="submit"
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-400"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-cyan-400 transition"
             >
               {savedToast ? (
                 <>
-                  <Check className="w-4 h-4 text-emerald-400" /> Đã lưu
+                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Đã lưu
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4 text-cyan-400" /> Lưu Kịch bản
+                  <Save className="w-3.5 h-3.5 text-cyan-400" /> Lưu
                 </>
               )}
             </button>
@@ -512,122 +400,88 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               type="button"
               disabled={busy}
               onClick={handleSaveAndRun}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-5 py-2 text-xs font-bold text-slate-950 hover:opacity-95 shadow-lg"
+              className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-1.5 text-xs font-bold text-slate-950 hover:opacity-95 shadow transition"
             >
-              <Play className="w-4 h-4 fill-current" />
-              Lưu & Chạy Kiểm thử Thật (Sang Bước 4)
+              <Play className="w-3.5 h-3.5 fill-current" />
+              Chạy Kiểm Thử Thật (Bước 4)
             </button>
           </div>
         </div>
 
-        {/* 6 PERFORMANCE TEST TYPES + 5 SECURITY TEST TYPES SELECTOR GRID */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-cyan-300">
-              1A. Nhóm Kiểm thử Hiệu năng & Chịu tải (6 Loại Performance Testing Chuẩn)
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {TEST_TYPE_CATALOG.filter((item) => item.group === 'PERFORMANCE').map(
-                (item) => {
-                  const isSelected = testType === item.type;
-                  return (
-                    <button
-                      key={item.type}
-                      type="button"
-                      onClick={() => handleSelectTestTypePreset(item.type)}
-                      className={`text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1.5 ${
-                        isSelected
-                          ? 'border-cyan-400 bg-cyan-950/35 shadow-sm'
-                          : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+        {/* 1. THREE CORE PRESET TABS (MINIMALIST SEGMENTED CONTROL) */}
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-3 gap-2">
+            {TEST_TYPE_CATALOG.map((item) => {
+              const isSelected = testType === item.type;
+              return (
+                <button
+                  key={item.type}
+                  type="button"
+                  onClick={() => handleSelectTestTypePreset(item.type)}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-0.5 relative ${
+                    isSelected
+                      ? `${item.accentBorder} bg-slate-950 shadow-sm ring-1 ring-cyan-500/30`
+                      : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      {item.icon}
+                      {item.title}
+                    </span>
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                        isSelected ? item.activeBg : 'bg-slate-800 text-slate-400'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          {item.icon}
-                          {item.title}
-                        </span>
-                        {isSelected && (
-                          <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-300 font-medium leading-snug">
-                        {item.purpose}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">{item.example}</p>
-                    </button>
-                  );
-                }
-              )}
-            </div>
+                      {item.badgeLabel}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    {item.subtitle}
+                  </p>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-emerald-300">
-              1B. Nhóm Kiểm thử Bảo mật (5 Loại Security Testing: DAST, API, Auth/RBAC, Infra Scan, Pentest)
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {TEST_TYPE_CATALOG.filter((item) => item.group === 'SECURITY').map(
-                (item) => {
-                  const isSelected = testType === item.type;
-                  return (
-                    <button
-                      key={item.type}
-                      type="button"
-                      onClick={() => handleSelectTestTypePreset(item.type)}
-                      className={`text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1.5 ${
-                        isSelected
-                          ? 'border-emerald-400 bg-emerald-950/35 shadow-sm'
-                          : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          {item.icon}
-                          {item.title}
-                        </span>
-                        {item.automation && (
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
-                              item.automation === 'Có'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            }`}
-                          >
-                            Tự động: {item.automation}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-300 font-medium leading-snug">
-                        {item.purpose}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">{item.example}</p>
-                    </button>
-                  );
-                }
-              )}
+          {/* COMPACT SINGLE-LINE ARCHITECTURAL FLOW BADGE */}
+          <div className="px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs text-slate-300">
+            <div className="flex items-center gap-1.5 font-mono text-[11px]">
+              <span className="text-indigo-400 font-bold">KubePulse ({virtualUsers}{showPeak ? `➔${peakVirtualUsers}` : ''} VUs)</span>
+              <ArrowRight className="w-3 h-3 text-slate-500" />
+              <span className="text-amber-400 font-bold">Ingress ({targetPath})</span>
+              <ArrowRight className="w-3 h-3 text-slate-500" />
+              <span className="text-emerald-400 font-bold">Pod ({targetWorkload || 'gateway'})</span>
+              <ArrowRight className="w-3 h-3 text-slate-500" />
+              <span className="text-sky-400 font-bold">DB / Microservices</span>
             </div>
+            <span className="text-[10px] text-slate-400 hidden sm:inline truncate max-w-[280px]">
+              {activeMeta.flowDescription}
+            </span>
           </div>
         </div>
 
-        {/* Name & Protocol */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Tên Kịch bản *
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none"
-            />
-          </div>
+        {/* 2. TARGET ENDPOINT ROW (METHOD + PROTOCOL + BASE URL + PATH) */}
+        <div className="grid grid-cols-12 gap-2">
+          {protocol === 'HTTP' && (
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">Method</label>
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value as any)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none"
+              >
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+            </div>
+          )}
 
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Giao thức (Protocol)
-            </label>
+          <div className={protocol === 'HTTP' ? 'col-span-3' : 'col-span-4'}>
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Giao thức</label>
             <select
               value={protocol}
               onChange={(e) => {
@@ -643,320 +497,180 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
                   );
                 }
               }}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
             >
+              <option value="WEBSOCKET">WebSocket (WSS)</option>
               <option value="HTTP">HTTP / REST API</option>
-              <option value="WEBSOCKET">WebSocket Realtime Stream</option>
-              <option value="SECURITY_AUDIT">Security & K8s Spec Audit</option>
             </select>
           </div>
-        </div>
 
-        {/* Target URL & Path with Quick-Select from Discovered Ingresses */}
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-300">
-              2. Địa chỉ Đích & Đường dẫn (Target Endpoint)
-            </span>
-            {topology && topology.ingresses.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-slate-400">
-                  Chọn nhanh từ Ingress:
-                </span>
-                {topology.ingresses.map((r, idx) => (
-                  <button
-                    key={`${r.path}-${idx}`}
-                    type="button"
-                    onClick={() => {
-                      const isWs = r.protocol === 'WSS';
-                      setProtocol(isWs ? 'WEBSOCKET' : 'HTTP');
-                      setTargetBaseUrl(
-                        `${isWs ? (r.tlsEnabled ? 'wss' : 'ws') : r.tlsEnabled ? 'https' : 'http'}://${r.host}`
-                      );
-                      setTargetPath(r.path);
-                    }}
-                    className="rounded-md bg-slate-900 border border-slate-700 hover:border-cyan-400 px-2 py-0.5 font-mono text-[11px] text-cyan-300"
-                  >
-                    {r.path}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className={protocol === 'HTTP' ? 'col-span-4' : 'col-span-5'}>
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Host / Target URL *</label>
+            <input
+              type="text"
+              required
+              value={targetBaseUrl}
+              onChange={(e) => setTargetBaseUrl(e.target.value)}
+              placeholder="wss://fumifood.dpdns.org hoặc https://..."
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none"
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-            {protocol !== 'WEBSOCKET' && (
-              <div className="md:col-span-1">
-                <label className="block text-[11px] text-slate-400 mb-1">
-                  Method
-                </label>
-                <select
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 font-mono text-xs text-white"
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
-              </div>
-            )}
-
-            <div className={protocol === 'WEBSOCKET' ? 'md:col-span-4' : 'md:col-span-3'}>
-              <label className="block text-[11px] text-slate-400 mb-1">
-                Base URL (https://... hoặc wss://...)
-              </label>
-              <input
-                type="text"
-                required
-                value={targetBaseUrl}
-                onChange={(e) => setTargetBaseUrl(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-white"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-[11px] text-slate-400 mb-1">
-                Đường dẫn (Path)
-              </label>
-              <input
-                type="text"
-                required
-                value={targetPath}
-                onChange={(e) => setTargetPath(e.target.value)}
-                placeholder="/healthz"
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-cyan-300"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">
-                Authorization Header (Tùy chọn - VD: Bearer eyJ...)
-              </label>
-              <input
-                type="text"
-                value={authHeader}
-                onChange={(e) => setAuthHeader(e.target.value)}
-                placeholder="Bearer <JWT_TOKEN>"
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 font-mono text-xs text-slate-200"
-              />
-            </div>
-            {(method === 'POST' || method === 'PUT') && (
-              <div>
-                <label className="block text-[11px] text-slate-400 mb-1">
-                  JSON Request Body (Để trống nếu dùng Volume Auto-Batch)
-                </label>
-                <input
-                  type="text"
-                  value={requestBody}
-                  onChange={(e) => setRequestBody(e.target.value)}
-                  placeholder='{"key": "value"}'
-                  className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 font-mono text-xs text-slate-200"
-                />
-              </div>
-            )}
+          <div className="col-span-3">
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Đường dẫn (Path) *</label>
+            <input
+              type="text"
+              required
+              value={targetPath}
+              onChange={(e) => setTargetPath(e.target.value)}
+              placeholder="/ws"
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none"
+            />
           </div>
         </div>
 
-        {/* Sliders: Load Scale & Duration & Mode-Specific Parameters */}
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 space-y-4">
-          <div className="text-xs font-semibold text-slate-300">
-            3. Thông số Tải & Đường cong Lưu lượng ({testType})
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 3. COMPACT TRAFFIC & DURATION CONTROLS */}
+        <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/70 space-y-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            {/* VUs / Base Users */}
             <div>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-slate-300 font-medium">
-                  {showPeakSlider ? 'Users Khởi điểm / Nền:' : 'Số Người dùng (Virtual Users):'}
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-slate-400 font-medium">
+                  {testType === 'STRESS_TEST' ? 'Khởi điểm' : testType === 'SPIKE_TEST' ? 'Tải nền' : 'VUs Đều'}:
                 </span>
-                <span className="font-mono font-bold text-cyan-300">
-                  {virtualUsers} Users
-                </span>
+                <span className="font-mono font-bold text-cyan-300">{virtualUsers} VUs</span>
               </div>
               <input
                 type="range"
                 min={1}
-                max={500}
+                max={300}
                 value={virtualUsers}
                 onChange={(e) => setVirtualUsers(Number(e.target.value))}
                 className="w-full accent-cyan-400"
               />
-              <span className="text-[10px] text-slate-400">
-                {showPeakSlider
-                  ? 'Mức tải nền ban đầu trước khi tăng Stress / Spike'
-                  : 'Số luồng người dùng truy cập đồng thời'}
-              </span>
             </div>
 
-            {showPeakSlider && (
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-rose-300 font-medium">
-                    {testType === 'SPIKE_TEST'
-                      ? 'Đỉnh Spike Đột ngột (10x):'
-                      : 'Users Cực đại (Peak Users):'}
-                  </span>
-                  <span className="font-mono font-bold text-rose-300">
-                    {peakVirtualUsers} Users
-                  </span>
-                </div>
+            {/* Peak VUs (for Stress / Spike) or SLA Target */}
+            <div>
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-slate-400 font-medium">
+                  {showPeak ? (testType === 'SPIKE_TEST' ? 'Đỉnh Sốc 10x' : 'Đỉnh Gãy') : 'Mục tiêu SLA'}:
+                </span>
+                <span className={`font-mono font-bold ${showPeak ? 'text-rose-400' : 'text-slate-300'}`}>
+                  {showPeak ? `${peakVirtualUsers} VUs` : `${virtualUsers} VUs`}
+                </span>
+              </div>
+              {showPeak ? (
                 <input
                   type="range"
                   min={virtualUsers}
-                  max={1000}
+                  max={800}
                   step={10}
                   value={peakVirtualUsers}
                   onChange={(e) => setPeakVirtualUsers(Number(e.target.value))}
                   className="w-full accent-rose-400"
                 />
-                <span className="text-[10px] text-slate-400">
-                  {testType === 'STRESS_TEST'
-                    ? 'Tăng bậc thang 5 nấc lên mức cực đại để tìm điểm gãy'
-                    : testType === 'SPIKE_TEST'
-                    ? 'Tăng vọt tức thì lên đỉnh Spike rồi hạ về nền'
-                    : 'Mức tải mở rộng tối đa để đo RPS/Pod'}
-                </span>
-              </div>
-            )}
+              ) : (
+                <div className="text-[10px] text-slate-500 py-1 font-mono">Duy trì mức ổn định</div>
+              )}
+            </div>
 
-            {testType === 'VOLUME_TEST' && (
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-purple-300 font-medium">
-                    Khối lượng Dữ liệu / Request:
-                  </span>
-                  <span className="font-mono font-bold text-purple-300">
-                    {volumePayloadKb} KB / req
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={8}
-                  max={2048}
-                  step={32}
-                  value={volumePayloadKb}
-                  onChange={(e) => setVolumePayloadKb(Number(e.target.value))}
-                  className="w-full accent-purple-400"
-                />
-                <span className="text-[10px] text-slate-400">
-                  Tự sinh lô bản ghi JSON lớn (lên tới 2048 KB) để kiểm tra bộ nhớ V8 & crash OOM
-                </span>
-              </div>
-            )}
-
+            {/* Duration */}
             <div>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-slate-300 font-medium">
-                  Thời lượng chạy (Duration):
-                </span>
-                <span className="font-mono font-bold text-emerald-300">
-                  {durationSeconds} giây
-                </span>
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-slate-400 font-medium">Thời lượng:</span>
+                <span className="font-mono font-bold text-emerald-300">{durationSeconds}s</span>
               </div>
               <input
                 type="range"
-                min={5}
-                max={testType === 'SOAK_ENDURANCE_TEST' ? 600 : 180}
+                min={10}
+                max={120}
                 step={5}
                 value={durationSeconds}
                 onChange={(e) => setDurationSeconds(Number(e.target.value))}
                 className="w-full accent-emerald-400"
               />
-              <span className="text-[10px] text-slate-400">
-                {testType === 'SOAK_ENDURANCE_TEST'
-                  ? 'Chạy dài hạn (lên tới 600s+) để dò Memory Leak'
-                  : 'Tổng thời gian thực hiện bài kiểm thử'}
-              </span>
             </div>
 
-            {!showPeakSlider && testType !== 'VOLUME_TEST' && (
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-slate-300 font-medium">
-                    Thời gian tăng tốc (Ramp-up):
-                  </span>
-                  <span className="font-mono font-bold text-purple-300">
-                    {rampUpSeconds} giây
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={30}
-                  value={rampUpSeconds}
-                  onChange={(e) => setRampUpSeconds(Number(e.target.value))}
-                  className="w-full accent-purple-400"
-                />
-                <span className="text-[10px] text-slate-400">
-                  Tăng dần người dùng để quan sát điểm nghẽn
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* K8s Correlation Scope & Safety Circuit Breaker */}
-        <div className="rounded-xl border border-amber-500/30 bg-amber-950/15 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-            <ShieldAlert className="w-4 h-4" />
-            4. Đối chiếu K8s & Cầu chì Tự ngắt An toàn (Safety Circuit Breaker)
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[11px] text-slate-300 mb-1">
-                K8s Namespace Giám sát
-              </label>
-              <input
-                type="text"
-                value={targetNamespace}
-                onChange={(e) => setTargetNamespace(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 font-mono text-xs text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-300 mb-1">
-                Workload (Deployment / Pod) Giám sát
-              </label>
-              <select
-                value={targetWorkload}
-                onChange={(e) => setTargetWorkload(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 font-mono text-xs text-white"
-              >
-                <option value="">-- Tự động lấy Pod đầu tiên --</option>
-                {topology?.workloads.map((w) => (
-                  <option key={w.name} value={w.name}>
-                    {w.name} (Limit: {w.memoryLimitMi ? `${w.memoryLimitMi}Mi` : 'N/A'})
-                  </option>
-                ))}
-              </select>
-            </div>
-
+            {/* Safety Circuit Breaker */}
             <div>
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-amber-200 font-medium">
-                  Ngưỡng Cầu chì Tự ngắt RAM:
-                </span>
-                <span className="font-mono font-bold text-amber-300">
-                  {safetyAbortMemoryPercent}% Limit
-                </span>
+                <span className="text-amber-400 font-medium">Cầu chì Pod:</span>
+                <span className="font-mono font-bold text-amber-300">{safetyAbortMemoryPercent}% RAM</span>
               </div>
               <input
                 type="range"
                 min={50}
-                max={95}
-                step={5}
+                max={98}
                 value={safetyAbortMemoryPercent}
                 onChange={(e) => setSafetyAbortMemoryPercent(Number(e.target.value))}
                 className="w-full accent-amber-400"
               />
             </div>
           </div>
+        </div>
+
+        {/* 4. COLLAPSIBLE ADVANCED CONFIG (AUTH / WORKLOAD / PAYLOAD) */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-200 transition"
+          >
+            {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            Tùy chọn Nâng cao (Authorization, Pod Target, Request Body)
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-2.5 p-3 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2.5 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">Tên Kịch bản</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">Mục tiêu Pod Workload (K8s)</label>
+                  <input
+                    type="text"
+                    value={targetWorkload}
+                    onChange={(e) => setTargetWorkload(e.target.value)}
+                    placeholder="fumi-live-gateway"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">Authorization Header (JWT / Token)</label>
+                <input
+                  type="text"
+                  value={authHeader}
+                  onChange={(e) => setAuthHeader(e.target.value)}
+                  placeholder="Bearer eyJhbGciOi..."
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none"
+                />
+              </div>
+
+              {protocol === 'HTTP' && (method === 'POST' || method === 'PUT') && (
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">JSON Request Body</label>
+                  <textarea
+                    rows={2}
+                    value={requestBody}
+                    onChange={(e) => setRequestBody(e.target.value)}
+                    placeholder='{"action": "test"}'
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </form>
     </div>

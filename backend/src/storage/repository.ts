@@ -7,6 +7,7 @@ import {
   ClusterConnection,
   ClusterConnectionPublic,
   NamespaceTopologySnapshot,
+  ScenarioProtocol,
   TestRunRecord,
   TestScenario,
 } from '../types.js';
@@ -278,26 +279,37 @@ export class StorageRepository {
       ? `${firstIngress.tlsEnabled ? 'https' : 'http'}://${firstIngress.host}`
       : cluster.externalBaseUrl || 'https://localhost';
 
+    const wsRoute = snapshot.ingresses.find((r) => r.protocol === 'WSS');
+    const wsBaseUrl = wsRoute
+      ? `${wsRoute.tlsEnabled ? 'wss' : 'ws'}://${wsRoute.host}`
+      : baseUrl.replace(/^http/, 'ws');
+    const wsPath = wsRoute?.path || '/ws';
+
     const httpRoutes = snapshot.ingresses.filter((r) => r.protocol !== 'WSS');
     const primaryPath = httpRoutes[0]?.path || '/healthz';
     const dataPath =
       httpRoutes.find((r) => r.path !== '/healthz' && r.path !== '/')?.path || primaryPath;
 
+    // Prefer WebSocket if gateway has WSS ingress (e.g. real-time audio gateway)
+    const effectiveProtocol: ScenarioProtocol = wsRoute ? 'WEBSOCKET' : 'HTTP';
+    const effectiveBaseUrl = wsRoute ? wsBaseUrl : baseUrl;
+    const effectivePath = wsRoute ? wsPath : dataPath;
+
     // 1. Load Testing — Kiểm tra hệ thống với tải dự kiến
     created.push(
       this.saveScenario({
         clusterId: cluster.id,
-        name: `[1. Load Testing] Kiểm tra Tải Dự kiến (${primaryPath})`,
-        description: `Kiểm tra hệ thống hoạt động ổn định ở mức tải mục tiêu dự kiến và đối chiếu SLA (p95 Latency, RAM/CPU của Pod ${primaryWorkload || snapshot.namespace}).`,
+        name: `[1. Load Testing] Kiểm tra Tải Dự kiến (${effectivePath})`,
+        description: `Kiểm tra hệ thống hoạt động ổn định ở mức tải mục tiêu dự kiến (Ramp-up êm ái -> Giữ đều tải nền -> Đo p95 Latency & RAM/CPU của Pod ${primaryWorkload || snapshot.namespace}).`,
         testType: 'LOAD_TEST',
-        protocol: 'HTTP',
+        protocol: effectiveProtocol,
         method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: primaryPath,
+        targetBaseUrl: effectiveBaseUrl,
+        targetPath: effectivePath,
         headers: {},
         virtualUsers: 50,
         peakVirtualUsers: 50,
-        durationSeconds: 20,
+        durationSeconds: 25,
         rampUpSeconds: 5,
         targetNamespace: snapshot.namespace,
         targetWorkload: primaryWorkload,
@@ -309,13 +321,13 @@ export class StorageRepository {
     created.push(
       this.saveScenario({
         clusterId: cluster.id,
-        name: `[2. Stress Testing] Tìm Điểm Gãy Hạ tầng (${dataPath})`,
-        description: `Tăng tải bậc thang liên tục từ 30 lên 300 Users vượt giới hạn chịu đựng để xác định chính xác Điểm gãy (Breaking Point: ngưỡng bắt đầu báo lỗi 5xx/429 hoặc chạm trần RAM).`,
+        name: `[2. Stress Testing] Tăng Tải Bậc Thang Dò Điểm Gãy (${effectivePath})`,
+        description: `Tăng tải bậc thang 5 nấc liên tục từ 30 lên 300 Users vượt giới hạn chịu đựng để xác định chính xác Điểm gãy (Breaking Point: ngưỡng bắt đầu báo lỗi 5xx/429 hoặc chạm trần RAM).`,
         testType: 'STRESS_TEST',
-        protocol: 'HTTP',
+        protocol: effectiveProtocol,
         method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: dataPath,
+        targetBaseUrl: effectiveBaseUrl,
+        targetPath: effectivePath,
         headers: {},
         virtualUsers: 30,
         peakVirtualUsers: 300,
@@ -323,7 +335,7 @@ export class StorageRepository {
         rampUpSeconds: 5,
         targetNamespace: snapshot.namespace,
         targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 88,
+        safetyAbortMemoryPercent: 90,
       })
     );
 
@@ -331,13 +343,13 @@ export class StorageRepository {
     created.push(
       this.saveScenario({
         clusterId: cluster.id,
-        name: `[3. Spike Testing] Sốc Tải Đột ngột Gấp 10 Lần (${primaryPath})`,
+        name: `[3. Spike Testing] Sốc Tải Đột Ngột Gấp 10 Lần (${effectivePath})`,
         description: `Đang chạy tải nền 20 Users thì tăng vọt đột ngột gấp 10 lần (200 Users) không báo trước, sau đó hạ đột ngột để đo thời gian hệ thống tự phục hồi (Recovery Time).`,
         testType: 'SPIKE_TEST',
-        protocol: 'HTTP',
+        protocol: effectiveProtocol,
         method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: primaryPath,
+        targetBaseUrl: effectiveBaseUrl,
+        targetPath: effectivePath,
         headers: {},
         virtualUsers: 20,
         peakVirtualUsers: 200,
@@ -346,210 +358,6 @@ export class StorageRepository {
         targetNamespace: snapshot.namespace,
         targetWorkload: primaryWorkload,
         safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 4. Endurance / Soak Testing — Kiểm tra hệ thống khi chịu tải lâu dài (Phát hiện Memory Leak)
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[4. Endurance / Soak Testing] Chịu tải Dài hạn & Dò Rò rỉ RAM`,
-        description: `Duy trì tải liên tục trong thời gian dài để kiểm tra độ bền (Soak Test), theo dõi độ lệch bộ nhớ (Memory Drift MiB) nhằm phát hiện rò rỉ RAM (Memory Leak) hoặc nghẽn kết nối.`,
-        testType: 'SOAK_ENDURANCE_TEST',
-        protocol: 'HTTP',
-        method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: primaryPath,
-        headers: {},
-        virtualUsers: 35,
-        peakVirtualUsers: 35,
-        durationSeconds: 60,
-        rampUpSeconds: 8,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 5. Scalability Testing — Kiểm tra khả năng mở rộng khi tăng tài nguyên / số Pod
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[5. Scalability Testing] Đánh giá Khả năng Mở rộng Pod (${currentReplicas} -> ${Math.max(4, currentReplicas * 3)} Pods)`,
-        description: `Đo lường hiệu năng mở rộng (RPS trên mỗi Pod, độ trễ và mức chia tải CPU/RAM) khi tăng quy mô Pod từ ${currentReplicas} lên ${Math.max(4, currentReplicas * 3)} Replicas.`,
-        testType: 'SCALABILITY_TEST',
-        protocol: 'HTTP',
-        method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: dataPath,
-        headers: {},
-        virtualUsers: 60,
-        peakVirtualUsers: 120,
-        targetPodReplicas: Math.max(4, currentReplicas * 3),
-        durationSeconds: 25,
-        rampUpSeconds: 6,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 6. Volume Testing — Kiểm tra khi dữ liệu có khối lượng lớn (Large Payload / DB Batch)
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[6. Volume Testing] Kiểm thử Khối lượng Dữ liệu Lớn (${dataPath})`,
-        description: `Bắn luồng dữ liệu có dung lượng lớn (Heavy Payload 64KB/request & tham số truy vấn tập bản ghi lớn) để kiểm tra băng thông xử lý, bộ nhớ V8 Heap và tốc độ truy vấn Database.`,
-        testType: 'VOLUME_TEST',
-        protocol: 'HTTP',
-        method: 'POST',
-        targetBaseUrl: baseUrl,
-        targetPath: `${dataPath}${dataPath.includes('?') ? '&' : '?'}limit=5000&volumeTest=true`,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        volumePayloadKb: 64,
-        virtualUsers: 25,
-        peakVirtualUsers: 25,
-        durationSeconds: 20,
-        rampUpSeconds: 4,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 7. DAST (Dynamic Application Security Testing) — Tự động hóa: Có
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[7. DAST] Rà quét Lỗ hổng Web Động (${primaryPath})`,
-        description: `[Tự động hóa: Có] Phát hiện lỗ hổng ứng dụng web khi đang chạy: kiểm tra XSS/SQLi reflection, HTTP Security Headers (HSTS, CSP, XFO) và rò rỉ thông tin Server.`,
-        testType: 'SECURITY_DAST',
-        protocol: 'SECURITY_AUDIT',
-        method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: primaryPath,
-        headers: {},
-        virtualUsers: 5,
-        durationSeconds: 10,
-        rampUpSeconds: 2,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 8. API Security — Tự động hóa: Một phần
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[8. API Security] Kiểm tra Input, Quyền & Hành vi API (${dataPath})`,
-        description: `[Tự động hóa: Một phần] Kiểm tra phản ứng của API với dữ liệu đầu vào bất thường (Malformed JSON/Query), HTTP Method Tampering, CORS Origin và cơ chế Rate Limiting.`,
-        testType: 'SECURITY_API',
-        protocol: 'SECURITY_AUDIT',
-        method: 'POST',
-        targetBaseUrl: baseUrl,
-        targetPath: dataPath,
-        headers: { 'Content-Type': 'application/json' },
-        virtualUsers: 8,
-        durationSeconds: 12,
-        rampUpSeconds: 2,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 9. Authentication / Authorization — Tự động hóa: Một phần
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[9. Auth / RBAC] Xác minh Vai trò & Quyền Truy cập (${dataPath})`,
-        description: `[Tự động hóa: Một phần] Xác minh cơ chế Authentication/Authorization: thử truy cập ẩn danh (No Token), Token giả mạo/hết hạn (Invalid JWT) để phát hiện lỗi Broken Access Control (BOLA).`,
-        testType: 'SECURITY_AUTH',
-        protocol: 'SECURITY_AUDIT',
-        method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: dataPath,
-        headers: {},
-        virtualUsers: 5,
-        durationSeconds: 10,
-        rampUpSeconds: 2,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 10. Infrastructure Scan — Tự động hóa: Có
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[10. Infrastructure Scan] Quét Cấu hình Hạ tầng K8s & Ingress (${snapshot.namespace})`,
-        description: `[Tự động hóa: Có] Phát hiện cấu hình không an toàn trên Kubernetes: kiểm toán NetworkPolicy, Pod SecurityContext (runAsNonRoot, readOnlyRootFS), Resource Quotas/Limits và TLS.`,
-        testType: 'SECURITY_INFRA',
-        protocol: 'SECURITY_AUDIT',
-        method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: primaryPath,
-        headers: {},
-        virtualUsers: 4,
-        durationSeconds: 10,
-        rampUpSeconds: 2,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    // 11. Pentest (Penetration Testing) — Tự động hóa: Một phần
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[11. Pentest] Kiểm thử Xâm nhập & Chuỗi Khai thác Logic (${dataPath})`,
-        description: `[Tự động hóa: Một phần] Mô phỏng chuỗi khai thác đa bước (Recon -> Path Traversal / IDOR Probe -> Race Burst) kết hợp đối chiếu Log/Events bên trong Pod để phát hiện lỗi logic phức tạp.`,
-        testType: 'SECURITY_PENTEST',
-        protocol: 'SECURITY_AUDIT',
-        method: 'GET',
-        targetBaseUrl: baseUrl,
-        targetPath: dataPath,
-        headers: {},
-        virtualUsers: 10,
-        durationSeconds: 15,
-        rampUpSeconds: 3,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 85,
-      })
-    );
-
-    const wsRoute = snapshot.ingresses.find((r) => r.protocol === 'WSS');
-    const wsBaseUrl = wsRoute
-      ? `${wsRoute.tlsEnabled ? 'wss' : 'ws'}://${wsRoute.host}`
-      : baseUrl.replace(/^http/, 'ws');
-    const wsPath = wsRoute?.path || '/ws';
-
-    // 12. OOM Crash Test — Ép Tràn RAM Đột Ngột (Gây chết Pod OOMKilled thật qua WebSocket Buffer Flood)
-    created.push(
-      this.saveScenario({
-        clusterId: cluster.id,
-        name: `[12. OOM Crash Test] Ép Tràn RAM WebSocket Buffer (WSS 64KB Flood)`,
-        description: `Mở 50-100 kết nối WebSocket trực tiếp vào ${wsPath} và bơm liên tục các frame nhị phân 64KB mỗi 60ms để làm nghẽn Event Loop và tràn bộ đệm RAM của Pod (Exit Code 137).`,
-        testType: 'VOLUME_TEST',
-        protocol: 'WEBSOCKET',
-        method: 'GET',
-        targetBaseUrl: wsBaseUrl,
-        targetPath: wsPath,
-        headers: {},
-        volumePayloadKb: 64,
-        virtualUsers: 50,
-        peakVirtualUsers: 100,
-        durationSeconds: 30,
-        rampUpSeconds: 2,
-        targetNamespace: snapshot.namespace,
-        targetWorkload: primaryWorkload,
-        safetyAbortMemoryPercent: 98,
       })
     );
 

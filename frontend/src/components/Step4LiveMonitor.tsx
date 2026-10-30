@@ -16,6 +16,11 @@ import {
   Check,
   History,
   ArrowLeft,
+  ArrowRight,
+  Globe,
+  Database,
+  Flame,
+  Zap,
 } from 'lucide-react';
 import { TestRunRecord } from '../types';
 
@@ -89,19 +94,19 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
 
   if (!currentRun) {
     return (
-      <div className="max-w-4xl mx-auto py-16 text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-400">
-          <Activity className="w-7 h-7" />
+      <div className="max-w-4xl mx-auto py-12 text-center space-y-3.5">
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-400">
+          <Activity className="w-6 h-6" />
         </div>
-        <h2 className="text-xl font-bold text-white">Chưa có Phiên Kiểm thử nào được chạy</h2>
-        <p className="text-sm text-slate-400 max-w-md mx-auto">
+        <h2 className="text-lg font-bold text-white">Chưa có Phiên Kiểm thử nào được chạy</h2>
+        <p className="text-xs text-slate-400 max-w-md mx-auto">
           Hãy quay lại Bước 3 để chọn một kịch bản kiểm thử và bấm <strong>Chạy Kiểm thử Thật</strong>.
         </p>
         <button
           onClick={onBackToScenarios}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           Quay lại Bước 3 (Thiết kế Kịch bản)
         </button>
       </div>
@@ -114,13 +119,13 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
   const cpuPct = k8s?.cpuUsagePercent ?? null;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Top Action Header */}
-      <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2.5">
+    <div className="max-w-7xl mx-auto space-y-3.5">
+      {/* 1. TOP COMPACT HEADER & PROGRESS */}
+      <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
                 currentRun.status === 'running'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   : currentRun.status === 'completed'
@@ -131,53 +136,37 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
               }`}
             >
               {currentRun.status === 'running' && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
               )}
               {currentRun.status === 'running'
-                ? 'ĐANG BẮN TẢI THỰC TẾ'
+                ? 'ĐANG CHẠY BẮN TẢI'
                 : currentRun.status === 'completed'
                 ? 'HOÀN TẤT'
                 : currentRun.status === 'aborted-by-safety'
-                ? 'CẦU CHÌ AN TOÀN ĐÃ NGẮT'
+                ? 'CẦU CHÌ ĐÃ NGẮT'
                 : currentRun.status.toUpperCase()}
             </span>
-            <h2 className="text-lg font-bold text-white">{currentRun.scenarioName}</h2>
+            <h2 className="text-sm font-bold text-white truncate max-w-md">{currentRun.scenarioName}</h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
-            <span className="font-mono text-cyan-300 bg-cyan-950/50 border border-cyan-500/20 px-2 py-0.5 rounded font-semibold">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 font-mono">
+            <span className="text-cyan-300 bg-cyan-950/50 border border-cyan-500/20 px-1.5 py-0.2 rounded font-semibold">
               {currentRun.testType || 'LOAD_TEST'}
             </span>
-            <span className="font-mono text-indigo-300 bg-indigo-950/50 border border-indigo-500/20 px-2 py-0.5 rounded">
+            <span className="text-indigo-300 truncate max-w-[220px]">
               [{currentRun.protocol}] {currentRun.targetUrl}
             </span>
             <span>•</span>
             <span>
-              Cụm: <strong className="text-slate-200">{currentRun.clusterName}</strong>
-              {currentRun.namespace ? ` (${currentRun.namespace})` : ''}
+              {latestTick?.elapsedSeconds || 0}s / {currentRun.durationSeconds}s
             </span>
-            <span>•</span>
-            <span>
-              Thời lượng:{' '}
-              <strong className="text-slate-200">
-                {latestTick?.elapsedSeconds || 0}s / {currentRun.durationSeconds}s
-              </strong>
-            </span>
-            {latestTick?.stageLabel && (
-              <>
-                <span>•</span>
-                <span className="text-emerald-300 font-semibold">
-                  Giai đoạn: {latestTick.stageLabel}
-                </span>
-              </>
-            )}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onBackToScenarios}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Đổi Kịch bản
@@ -186,222 +175,178 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
           {currentRun.status === 'running' ? (
             <button
               onClick={onStopRun}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/25 transition"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow transition"
             >
-              <Square className="w-3.5 h-3.5 fill-current" />
-              Dừng Khẩn cấp (Stop)
+              <Square className="w-3 h-3 fill-current" />
+              Dừng Khẩn cấp
             </button>
           ) : (
             <button
               onClick={() => onRerunScenario(currentRun.scenarioId)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/25 transition"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow transition"
             >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              Chạy lại Kịch bản này
+              <Play className="w-3 h-3 fill-current" />
+              Chạy lại
             </button>
           )}
         </div>
       </div>
 
-      {/* Progress Bar & Circuit Breaker Banner */}
-      <div className="space-y-2">
-        <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
-          <div
-            className={`h-full transition-all duration-300 ${
-              currentRun.status === 'aborted-by-safety'
-                ? 'bg-amber-500'
-                : currentRun.status === 'running'
-                ? 'bg-emerald-500'
-                : 'bg-indigo-500'
-            }`}
-            style={{ width: `${progressPct}%` }}
-          />
+      {/* SLIM PROGRESS BAR */}
+      <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden border border-slate-800/80">
+        <div
+          className={`h-full transition-all duration-300 ${
+            currentRun.status === 'aborted-by-safety'
+              ? 'bg-amber-500'
+              : currentRun.status === 'running'
+              ? 'bg-emerald-500'
+              : 'bg-indigo-500'
+          }`}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      {/* CRITICAL WARNING BANNERS IF TRIGGERED */}
+      {k8s?.oomKilledDetected && (
+        <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500 text-rose-200 text-xs flex items-center gap-2.5 animate-pulse">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          <div>
+            <strong className="text-white uppercase">🚨 Kubernetes OOMKilled (Exit Code 137): </strong>
+            Pod ứng dụng đã bị tiêu diệt do cạn RAM ({k8s.memoryLimitMi ? `${k8s.memoryLimitMi} MiB` : 'Limit'}). Hệ thống đã chính thức đạt điểm gãy!
+          </div>
+        </div>
+      )}
+
+      {currentRun.safetyBreaker.tripped && (
+        <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center gap-2 text-amber-200 text-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>
+            <strong>Cầu chì Tự ngắt: </strong>
+            {currentRun.safetyBreaker.trippedReasonVi || currentRun.safetyBreaker.trippedTechnical}
+          </span>
+        </div>
+      )}
+
+      {/* 2. ULTRA-COMPACT LIVE ARCHITECTURAL TELEMETRY STRIP */}
+      <div className="px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-2 shadow-sm text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Node 1: Engine */}
+          <span className="flex items-center gap-1 text-indigo-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            <strong>KubePulse:</strong> {ext?.activeWorkers || 0} VUs ({ext?.requestsPerSec || 0} rps)
+          </span>
+
+          <ArrowRight className="w-3 h-3 text-slate-600 hidden sm:inline" />
+
+          {/* Node 2: Ingress */}
+          <span className="flex items-center gap-1 text-amber-300">
+            <Globe className="w-3 h-3 text-amber-400" />
+            <strong>Ingress:</strong> {(ext?.status429 || 0) > 0 ? (
+              <span className="text-rose-400 font-bold">429: {ext?.status429}</span>
+            ) : (
+              <span className="text-emerald-400">Rate-Limit OK</span>
+            )}
+          </span>
+
+          <ArrowRight className="w-3 h-3 text-slate-600 hidden sm:inline" />
+
+          {/* Node 3: Target Pod */}
+          <span className="flex items-center gap-1 text-emerald-300">
+            <Cpu className="w-3 h-3 text-emerald-400" />
+            <strong>Pod:</strong> RAM {k8s?.totalMemoryMi ?? 0}M ({memPct ?? 0}%) | CPU {k8s?.totalCpuMillicores ?? 0}m ({cpuPct ?? 0}%)
+          </span>
+
+          <ArrowRight className="w-3 h-3 text-slate-600 hidden sm:inline" />
+
+          {/* Node 4: SLA */}
+          <span className="flex items-center gap-1 text-sky-300">
+            <Database className="w-3 h-3 text-sky-400" />
+            <strong>SLA:</strong> p95: {ext?.latencyP95Ms || 0}ms | 2xx: {ext?.status2xx || 0}
+          </span>
         </div>
 
-        {k8s?.oomKilledDetected && (
-          <div className="p-4 rounded-xl bg-rose-950/80 border-2 border-rose-500 text-rose-200 text-xs flex items-center gap-3 animate-pulse shadow-lg shadow-rose-950/50">
-            <AlertTriangle className="w-6 h-6 text-rose-400 shrink-0" />
-            <div>
-              <div className="font-bold text-sm text-rose-100 uppercase tracking-wide">
-                🚨 SỰ KIỆN KUBERNETES: OOMKilled (Exit Code 137)
-              </div>
-              <div className="mt-0.5 text-rose-300">
-                Pod ứng dụng đã bị hệ điều hành tiêu diệt hoàn toàn do vượt quá giới hạn RAM cho phép ({k8s.memoryLimitMi ? `${k8s.memoryLimitMi} MiB` : 'Memory Limit'}). Hệ thống đã chính thức sụp đổ (Breaking Point)!
-              </div>
-            </div>
-          </div>
-        )}
-
-        {currentRun.safetyBreaker.tripped && (
-          <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center gap-3 text-amber-200 text-xs">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
-              <span className="font-semibold">
-                Cầu chì Tự ngắt Bảo vệ Pod (Safety Circuit Breaker):{' '}
-              </span>
-              {currentRun.safetyBreaker.trippedReasonVi ||
-                currentRun.safetyBreaker.trippedTechnical}
-            </div>
-          </div>
-        )}
-
-        {/* Specialized Metrics Strip for the 6 Performance Test Types */}
-        {currentRun.specializedInsights && (
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-cyan-300 font-semibold">
-              <Activity className="w-4 h-4" />
-              <span>Chỉ số Chuyên biệt ({currentRun.specializedInsights.testType}):</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-slate-300 font-mono">
-              {currentRun.specializedInsights.testType === 'STRESS_TEST' && (
-                <span>
-                  Điểm gãy (Breaking Point):{' '}
-                  <strong className="text-rose-300">
-                    {currentRun.specializedInsights.breakingPointVu
-                      ? `${currentRun.specializedInsights.breakingPointVu} Users`
-                      : `Chưa gãy (Chịu tốt tới ${currentRun.peakVirtualUsers || currentRun.virtualUsers} Users)`}
-                  </strong>
-                </span>
-              )}
-              {currentRun.specializedInsights.testType === 'SPIKE_TEST' && (
-                <span>
-                  Thời gian hồi phục sau Spike 10x:{' '}
-                  <strong className="text-amber-300">
-                    {currentRun.specializedInsights.spikeRecoverySeconds !== null &&
-                    currentRun.specializedInsights.spikeRecoverySeconds !== undefined
-                      ? `${currentRun.specializedInsights.spikeRecoverySeconds} giây`
-                      : 'Đang đo lường...'}
-                  </strong>
-                </span>
-              )}
-              {currentRun.specializedInsights.testType === 'SOAK_ENDURANCE_TEST' && (
-                <span>
-                  Độ lệch Rò rỉ Bộ nhớ (Memory Drift):{' '}
-                  <strong className="text-emerald-300">
-                    {currentRun.specializedInsights.memoryDriftMi !== null &&
-                    currentRun.specializedInsights.memoryDriftMi !== undefined
-                      ? `${currentRun.specializedInsights.memoryDriftMi >= 0 ? '+' : ''}${currentRun.specializedInsights.memoryDriftMi} MiB`
-                      : 'Chờ K8s Metrics...'}
-                  </strong>
-                </span>
-              )}
-              {currentRun.specializedInsights.testType === 'SCALABILITY_TEST' && (
-                <span>
-                  Hiệu suất mở rộng:{' '}
-                  <strong className="text-indigo-300">
-                    {currentRun.specializedInsights.rpsPerPod ?? 0} req/s/Pod (Quan sát:{' '}
-                    {currentRun.specializedInsights.minPodsObserved || 1} →{' '}
-                    {currentRun.specializedInsights.maxPodsObserved || 1} Pods)
-                  </strong>
-                </span>
-              )}
-              {currentRun.specializedInsights.testType === 'VOLUME_TEST' && (
-                <span>
-                  Khối lượng Dữ liệu Lớn đã xử lý:{' '}
-                  <strong className="text-purple-300">
-                    {currentRun.specializedInsights.totalVolumeMbProcessed ?? 0} MB ({ext?.throughputKbps || 0} KB/s)
-                  </strong>
-                </span>
-              )}
-              {currentRun.specializedInsights.testType === 'LOAD_TEST' && (
-                <span>
-                  Tải dự kiến duy trì:{' '}
-                  <strong className="text-cyan-300">
-                    {currentRun.virtualUsers} Users đồng thời
-                  </strong>
-                </span>
-              )}
-            </div>
-          </div>
+        {/* Live Stage Badge */}
+        {latestTick?.stageLabel && (
+          <span className="px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold flex items-center gap-1">
+            {currentRun.testType === 'STRESS_TEST' ? (
+              <Flame className="w-3 h-3 text-rose-400" />
+            ) : currentRun.testType === 'SPIKE_TEST' ? (
+              <Zap className="w-3 h-3 text-amber-400" />
+            ) : (
+              <Activity className="w-3 h-3 text-cyan-400" />
+            )}
+            {latestTick.stageLabel}
+          </span>
         )}
       </div>
 
-      {/* 5 Clean Real-Time KPI Cards (Including CPU & RAM) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Card 1: Real Traffic */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Lưu lượng Thực tế</span>
-            <Activity className="w-4 h-4 text-indigo-400" />
+      {/* 3. 5 HIGH-DENSITY REAL-TIME KPI CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        {/* Card 1: Traffic & RPS */}
+        <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>Lưu lượng (RPS)</span>
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">{ext ? ext.requestsPerSec : 0}</span>
-            <span className="text-xs text-slate-400">req/giây</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-white">{ext ? ext.requestsPerSec : 0}</span>
+            <span className="text-[10px] text-slate-400">req/s</span>
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
-            <span>
-              Tổng: <strong className="text-slate-200">{ext?.totalRequests || 0}</strong>
-            </span>
-            <span>
-              Users: <strong className="text-indigo-300">{ext?.activeWorkers || 0}</strong>
-            </span>
+          <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80 font-mono">
+            <span>Tổng: {ext?.totalRequests || 0}</span>
+            <span className="text-indigo-300 font-bold">{ext?.activeWorkers || 0} VUs</span>
           </div>
         </div>
 
-        {/* Card 2: Real Latency */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Độ trễ Phản hồi (p95)</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+        {/* Card 2: Latency p95 */}
+        <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>Độ trễ (p95)</span>
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">{ext ? ext.latencyP95Ms : 0}</span>
-            <span className="text-xs text-slate-400">ms (p95)</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-white">{ext ? ext.latencyP95Ms : 0}</span>
+            <span className="text-[10px] text-slate-400">ms</span>
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
-            <span>
-              p50: <strong className="text-slate-200">{ext?.latencyP50Ms || 0} ms</strong>
-            </span>
-            <span>
-              TB: <strong className="text-slate-200">{ext?.latencyAvgMs || 0} ms</strong>
-            </span>
+          <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80 font-mono">
+            <span>p50: {ext?.latencyP50Ms || 0}ms</span>
+            <span>TB: {ext?.latencyAvgMs || 0}ms</span>
           </div>
         </div>
 
-        {/* Card 3: Real HTTP/WS Status Codes */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Phân bổ Mã Trả về</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        {/* Card 3: Status Codes */}
+        <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>Mã Trả về</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
           </div>
-          <div className="grid grid-cols-2 gap-1 pt-0.5 text-xs">
-            <div className="px-1.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 flex justify-between">
-              <span>2xx:</span>
-              <strong>{ext?.status2xx || 0}</strong>
+          <div className="grid grid-cols-2 gap-1 pt-0.5 text-[11px] font-mono">
+            <div className="px-1 rounded bg-emerald-950/40 text-emerald-300 flex justify-between">
+              <span>2xx:</span> <strong>{ext?.status2xx || 0}</strong>
             </div>
-            <div className="px-1.5 py-0.5 rounded bg-amber-950/40 border border-amber-500/20 text-amber-300 flex justify-between">
-              <span>429:</span>
-              <strong>{ext?.status429 || 0}</strong>
+            <div className="px-1 rounded bg-amber-950/40 text-amber-300 flex justify-between">
+              <span>429:</span> <strong>{ext?.status429 || 0}</strong>
             </div>
-            <div className="px-1.5 py-0.5 rounded bg-indigo-950/40 border border-indigo-500/20 text-indigo-300 flex justify-between">
-              <span>Auth:</span>
-              <strong>{ext?.status401_403 || 0}</strong>
-            </div>
-            <div className="px-1.5 py-0.5 rounded bg-rose-950/40 border border-rose-500/20 text-rose-300 flex justify-between">
-              <span>5xx:</span>
-              <strong>{(ext?.status5xx || 0) + (ext?.networkErrors || 0)}</strong>
-            </div>
+          </div>
+          <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80 font-mono">
+            <span className="text-rose-400">5xx/Lỗi: {(ext?.status5xx || 0) + (ext?.networkErrors || 0)}</span>
+            <span className="text-slate-400">Auth: {ext?.status401_403 || 0}</span>
           </div>
         </div>
 
         {/* Card 4: RAM Pod K8s */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>RAM Pod K8s Thật</span>
-            <HardDrive className="w-4 h-4 text-sky-400" />
+        <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>RAM Pod K8s</span>
+            <HardDrive className="w-3.5 h-3.5 text-sky-400" />
           </div>
           {k8s && k8s.metricsAvailable ? (
             <>
               <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-white">{k8s.totalMemoryMi ?? 0}</span>
-                  <span className="text-xs text-slate-400 truncate max-w-[80px]">
-                    / {k8s.memoryLimitMi ? `${k8s.memoryLimitMi}M` : 'No Limit'}
-                  </span>
-                </div>
+                <span className="text-xl font-bold text-white">{k8s.totalMemoryMi ?? 0} <span className="text-xs text-slate-400 font-normal">MiB</span></span>
                 {memPct !== null && (
                   <span
-                    className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded font-mono ${
                       memPct >= 85
                         ? 'bg-rose-500/20 text-rose-300'
                         : memPct >= 70
@@ -413,55 +358,37 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                   </span>
                 )}
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    (memPct ?? 0) >= 85
-                      ? 'bg-rose-500'
-                      : (memPct ?? 0) >= 70
-                      ? 'bg-amber-500'
-                      : 'bg-sky-500'
+                    (memPct ?? 0) >= 85 ? 'bg-rose-500' : (memPct ?? 0) >= 70 ? 'bg-amber-500' : 'bg-sky-400'
                   }`}
                   style={{ width: `${Math.min(100, memPct ?? 0)}%` }}
                 />
               </div>
-              <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
-                <span className="truncate max-w-[120px]" title={k8s.primaryPodName}>
-                  Pod: <strong className="text-slate-200">{k8s.primaryPodName}</strong>
-                </span>
-                <span className="text-emerald-400 text-[10px]">{k8s.podPhase}</span>
+              <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80 font-mono truncate">
+                <span>Limit: {k8s.memoryLimitMi ? `${k8s.memoryLimitMi}M` : 'No Limit'}</span>
+                <span className="text-emerald-400">{k8s.podPhase}</span>
               </div>
             </>
           ) : (
-            <div className="text-xs text-slate-400 py-1 space-y-1">
-              <div>
-                Pod: <strong className="text-slate-200">{k8s?.primaryPodName || 'N/A'}</strong>
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Chờ K8s Metrics Server...
-              </div>
-            </div>
+            <div className="text-[11px] text-slate-400 py-1 font-mono">Chờ K8s Metrics...</div>
           )}
         </div>
 
         {/* Card 5: CPU Pod K8s */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>CPU Pod K8s Thật</span>
-            <Cpu className="w-4 h-4 text-amber-400" />
+        <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>CPU Pod K8s</span>
+            <Cpu className="w-3.5 h-3.5 text-amber-400" />
           </div>
           {k8s && k8s.metricsAvailable ? (
             <>
               <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-white">{k8s.totalCpuMillicores ?? 0}m</span>
-                  <span className="text-xs text-slate-400 truncate max-w-[80px]">
-                    / {k8s.cpuLimitMillicores ? `${k8s.cpuLimitMillicores}m` : 'No Limit'}
-                  </span>
-                </div>
-                {cpuPct !== null ? (
+                <span className="text-xl font-bold text-white">{k8s.totalCpuMillicores ?? 0} <span className="text-xs text-slate-400 font-normal">m</span></span>
+                {cpuPct !== null && (
                   <span
-                    className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded font-mono ${
                       cpuPct >= 85
                         ? 'bg-rose-500/20 text-rose-300'
                         : cpuPct >= 70
@@ -471,100 +398,81 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                   >
                     {cpuPct}%
                   </span>
-                ) : (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                    {k8s.totalCpuMillicores ?? 0}m
-                  </span>
                 )}
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    (cpuPct ?? 0) >= 85
-                      ? 'bg-rose-500'
-                      : (cpuPct ?? 0) >= 70
-                      ? 'bg-amber-500'
-                      : 'bg-amber-400'
+                    (cpuPct ?? 0) >= 85 ? 'bg-rose-500' : (cpuPct ?? 0) >= 70 ? 'bg-amber-500' : 'bg-amber-400'
                   }`}
                   style={{ width: `${Math.min(100, cpuPct ?? 0)}%` }}
                 />
               </div>
-              <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
-                <span>
-                  Đỉnh: <strong className="text-amber-300">{Math.max(...currentRun.ticks.map((t) => t.internal.totalCpuMillicores || 0), k8s.totalCpuMillicores || 0)}m</strong>
-                </span>
-                <span>
-                  Replicas: <strong className="text-slate-200">{k8s.podCount || 1}</strong>
-                </span>
+              <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80 font-mono truncate">
+                <span>Limit: {k8s.cpuLimitMillicores ? `${k8s.cpuLimitMillicores}m` : 'No Limit'}</span>
+                <span>{k8s.podCount || 1} Pod</span>
               </div>
             </>
           ) : (
-            <div className="text-xs text-slate-400 py-1 space-y-1">
-              <div>
-                CPU: <strong className="text-slate-200">{k8s?.totalCpuMillicores !== null && k8s?.totalCpuMillicores !== undefined ? `${k8s.totalCpuMillicores}m` : 'N/A'}</strong>
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Chờ K8s Metrics Server...
-              </div>
-            </div>
+            <div className="text-[11px] text-slate-400 py-1 font-mono">Chờ K8s Metrics...</div>
           )}
         </div>
       </div>
 
-      {/* Main Content Layout: Left 3 Tabs + Right Run History */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 space-y-4">
+      {/* 4. MAIN EVALUATION & DETAILED RESULTS TABS */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-8 space-y-3">
           {/* Tab Switcher */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setActiveTab('SUMMARY')}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   activeTab === 'SUMMARY'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                 }`}
               >
-                <FileText className="w-3.5 h-3.5" />
-                1. Báo cáo Dễ hiểu (Quản lý / Non-Tech)
+                <FileText className="w-3 h-3" />
+                1. Tóm tắt Đánh giá
               </button>
               <button
                 onClick={() => setActiveTab('TECHNICAL')}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   activeTab === 'TECHNICAL'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                 }`}
               >
-                <Terminal className="w-3.5 h-3.5" />
-                2. Biểu đồ & Log K8s (Kỹ sư)
+                <Terminal className="w-3 h-3" />
+                2. Biểu đồ & Log K8s
               </button>
               <button
                 onClick={() => setActiveTab('SECURITY')}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   activeTab === 'SECURITY'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
+                <ShieldCheck className="w-3 h-3" />
                 3. Kiểm toán Bảo mật ({currentRun.securityFindings.length})
               </button>
             </div>
 
             <button
               onClick={handleCopyMarkdown}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition"
             >
               {copiedReport ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  Đã chép Markdown
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  Đã chép
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5" />
-                  Chép Báo cáo Markdown
+                  <Copy className="w-3 h-3" />
+                  Chép Markdown PR
                 </>
               )}
             </button>
@@ -572,10 +480,10 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
 
           {/* TAB 1: EXECUTIVE SUMMARY */}
           {activeTab === 'SUMMARY' && (
-            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-5 border-b border-slate-800">
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 pb-3.5 border-b border-slate-800">
                 <div
-                  className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 ${
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 ${
                     currentRun.evaluation.grade.startsWith('A')
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                       : currentRun.evaluation.grade === 'B'
@@ -588,33 +496,33 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                   {currentRun.evaluation.grade}
                 </div>
                 <div className="space-y-1">
-                  <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
                     Kết luận Đánh giá Tự động từ Số liệu Thực tế
                   </div>
-                  <h3 className="text-lg font-bold text-white">
+                  <h3 className="text-sm font-bold text-white">
                     {currentRun.evaluation.headlineVi}
                   </h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-xs text-slate-300 leading-relaxed">
                     {currentRun.evaluation.nonTechSummaryVi}
                   </p>
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs font-mono text-indigo-300">
+              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs font-mono text-indigo-300">
                 {currentRun.evaluation.engineerSummary}
               </div>
 
-              <div className="space-y-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Khuyến nghị Hành động Tiếp theo
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Khuyến nghị Hành động
                 </h4>
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                   {currentRun.evaluation.recommendationsVi.map((rec, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-200"
+                      className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-200"
                     >
-                      <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
                       <span>{rec}</span>
                     </li>
                   ))}
@@ -625,24 +533,24 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
 
           {/* TAB 2: TECHNICAL TIMELINE & K8S LOGS */}
           {activeTab === 'TECHNICAL' && (
-            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-6">
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
               <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Biểu đồ Đối chiếu Thời gian thực: Độ trễ p95 (ms) & Pod RAM / CPU
+                    Biểu đồ Thời gian thực: Độ trễ p95 (ms) & Pod RAM / CPU
                   </h4>
-                  <span className="text-[11px] text-slate-400">
-                    {currentRun.ticks.length} mẫu đo (1 giây / mẫu)
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {currentRun.ticks.length} mẫu đo (1s / mẫu)
                   </span>
                 </div>
 
                 {currentRun.ticks.length === 0 ? (
-                  <div className="h-44 flex items-center justify-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                  <div className="h-36 flex items-center justify-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
                     Đang đợi mẫu đo đầu tiên...
                   </div>
                 ) : (
                   <>
-                    <div className="h-48 flex items-end gap-1.5 pt-6 pb-2 px-3 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto">
+                    <div className="h-40 flex items-end gap-1 pt-4 pb-2 px-2.5 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto">
                       {currentRun.ticks.slice(-45).map((tick) => {
                         const maxLatency = Math.max(
                           ...currentRun.ticks.map((t) => t.external.latencyP95Ms),
@@ -655,9 +563,9 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                         return (
                           <div
                             key={tick.elapsedSeconds}
-                            className="flex-1 min-w-[14px] flex flex-col items-center gap-1 group relative"
+                            className="flex-1 min-w-[12px] flex flex-col items-center gap-1 group relative"
                           >
-                            <div className="w-full h-32 flex items-end justify-center gap-0.5">
+                            <div className="w-full h-28 flex items-end justify-center">
                               <div
                                 className={`w-full rounded-t transition-all ${
                                   tick.external.status5xx > 0
@@ -667,10 +575,10 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                                     : 'bg-indigo-500'
                                 }`}
                                 style={{ height: `${latencyHeightPct}%` }}
-                                title={`Giây ${tick.elapsedSeconds}s: p95=${tick.external.latencyP95Ms}ms | RPS=${tick.external.requestsPerSec} | RAM=${tick.internal.totalMemoryMi ?? 0}MiB (${tick.internal.memoryUsagePercent ?? 0}%) | CPU=${tick.internal.totalCpuMillicores ?? 0}m (${tick.internal.cpuUsagePercent ?? 0}%)`}
+                                title={`Giây ${tick.elapsedSeconds}s: p95=${tick.external.latencyP95Ms}ms | RAM=${tick.internal.totalMemoryMi ?? 0}MiB (${tick.internal.memoryUsagePercent ?? 0}%) | CPU=${tick.internal.totalCpuMillicores ?? 0}m (${tick.internal.cpuUsagePercent ?? 0}%)`}
                               />
                             </div>
-                            <span className="text-[9px] text-slate-500 font-mono">
+                            <span className="text-[8px] text-slate-500 font-mono">
                               {tick.elapsedSeconds}s
                             </span>
                           </div>
@@ -678,25 +586,23 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                       })}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-xs">
-                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-xs font-mono">
+                      <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
                         <span className="text-slate-400">Độ trễ p95 đỉnh:</span>
-                        <strong className="text-amber-300 font-mono">
+                        <strong className="text-amber-300">
                           {Math.max(...currentRun.ticks.map((t) => t.external.latencyP95Ms), 0)} ms
                         </strong>
                       </div>
-                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+                      <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
                         <span className="text-slate-400">Đỉnh RAM Pod:</span>
-                        <strong className="text-sky-300 font-mono">
+                        <strong className="text-sky-300">
                           {Math.max(...currentRun.ticks.map((t) => t.internal.totalMemoryMi || 0), 0)} MiB
-                          {k8s?.memoryLimitMi ? ` / ${k8s.memoryLimitMi}M` : ''}
                         </strong>
                       </div>
-                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+                      <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
                         <span className="text-slate-400">Đỉnh CPU Pod:</span>
-                        <strong className="text-amber-300 font-mono">
+                        <strong className="text-amber-300">
                           {Math.max(...currentRun.ticks.map((t) => t.internal.totalCpuMillicores || 0), 0)}m
-                          {k8s?.cpuLimitMillicores ? ` / ${k8s.cpuLimitMillicores}m` : ''}
                         </strong>
                       </div>
                     </div>
@@ -705,23 +611,23 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
               </div>
 
               {/* Real K8s Event & Pod Log Stream */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                     <Cpu className="w-3.5 h-3.5 text-amber-400" />
-                    Sự kiện Kubernetes (K8s Events Thật)
+                    Sự kiện Kubernetes (Events Thật)
                   </div>
-                  <div className="text-xs font-mono text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 min-h-[72px] break-words">
-                    {k8s?.recentEvent || 'Không có sự kiện cảnh báo mới trong Namespace.'}
+                  <div className="text-xs font-mono text-slate-300 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 min-h-[56px] break-words">
+                    {k8s?.recentEvent || 'Không có sự kiện cảnh báo mới.'}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                     <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                    Dòng Log Mới nhất từ Pod Đích
+                    Dòng Log Mới nhất từ Pod
                   </div>
-                  <div className="text-xs font-mono text-emerald-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 min-h-[72px] break-words">
+                  <div className="text-xs font-mono text-emerald-300 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 min-h-[56px] break-words">
                     {k8s?.recentLogLine || 'Đang chờ luồng log từ Pod...'}
                   </div>
                 </div>
@@ -731,51 +637,44 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
 
           {/* TAB 3: REAL SECURITY AUDIT FINDINGS */}
           {activeTab === 'SECURITY' && (
-            <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3">
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2.5">
               {currentRun.securityFindings.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-slate-400">
                   Kịch bản này chỉ chạy bắn tải thuần túy hoặc đang thu thập kết quả kiểm toán bảo mật...
                 </div>
               ) : (
                 currentRun.securityFindings.map((finding) => (
                   <div
                     key={finding.id}
-                    className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start gap-3.5"
+                    className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start gap-2.5"
                   >
                     {finding.status === 'PASS' ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     ) : finding.status === 'WARN' ? (
-                      <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                      <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                     )}
                     <div className="space-y-1 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-white">{finding.titleVi}</span>
-                        <div className="flex items-center gap-1.5">
-                          {finding.automationLevel && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700">
-                              Tự động hóa: {finding.automationLevel}
-                            </span>
-                          )}
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                              finding.status === 'PASS'
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : finding.status === 'WARN'
-                                ? 'bg-amber-500/20 text-amber-300'
-                                : 'bg-rose-500/20 text-rose-300'
-                            }`}
-                          >
-                            {finding.category} • {finding.status}
-                          </span>
-                        </div>
+                      <div className="flex flex-wrap items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-white">{finding.titleVi}</span>
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                            finding.status === 'PASS'
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : finding.status === 'WARN'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-rose-500/20 text-rose-300'
+                          }`}
+                        >
+                          {finding.category} • {finding.status}
+                        </span>
                       </div>
-                      <p className="text-xs font-mono text-slate-400">
+                      <p className="text-[11px] font-mono text-slate-400">
                         {finding.technicalCheck} → {finding.observedResult}
                       </p>
                       <p className="text-xs text-slate-300">{finding.nonTechExplanationVi}</p>
-                      <p className="text-[11px] text-indigo-300 pt-1">
+                      <p className="text-[11px] text-indigo-300">
                         <strong>Khuyến nghị:</strong> {finding.remediationVi}
                       </p>
                     </div>
@@ -787,37 +686,35 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
         </div>
 
         {/* Right Sidebar: Run History */}
-        <div className="lg:col-span-4 space-y-3">
-          <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <History className="w-4 h-4 text-indigo-400" />
-                Lịch sử Chạy Kiểm thử ({runsHistory.length})
-              </h3>
-            </div>
+        <div className="lg:col-span-4 space-y-2.5">
+          <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-indigo-400" />
+              Lịch sử Chạy ({runsHistory.length})
+            </h3>
 
-            <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
               {runsHistory.map((run) => {
                 const isSelected = run.id === currentRun.id;
                 return (
                   <button
                     key={run.id}
                     onClick={() => onSelectRun(run)}
-                    className={`w-full text-left p-3 rounded-xl border transition space-y-1.5 ${
+                    className={`w-full text-left p-2.5 rounded-xl border transition space-y-1 ${
                       isSelected
                         ? 'bg-indigo-950/50 border-indigo-500/50'
                         : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-1">
                       <span className="text-xs font-semibold text-white truncate">
                         {run.scenarioName}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-indigo-300">
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-indigo-300">
                         Hạng {run.evaluation.grade}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-400 font-mono truncate">
+                    <div className="text-[10px] text-slate-400 font-mono truncate">
                       [{run.protocol}] {run.targetUrl}
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500">

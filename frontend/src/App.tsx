@@ -7,6 +7,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import {
   ClusterConnectionPublic,
@@ -22,8 +24,19 @@ import { Step4LiveMonitor } from './components/Step4LiveMonitor';
 
 type StudioStep = 1 | 2 | 3 | 4;
 
+const STEP_TRANSITION_MESSAGES: Record<StudioStep, string> = {
+  1: 'Đang kết nối K8s Vault & nạp danh sách Cụm...',
+  2: 'Đang quét Topology, Ingress và Pods trong Namespace...',
+  3: 'Đang nạp Kịch bản Kiểm thử & Thiết lập Luồng Tải...',
+  4: 'Đang kết nối Bảng Giám sát & Luồng Telemetry Thời gian thực...',
+};
+
 export function App() {
   const [currentStep, setCurrentStep] = useState<StudioStep>(1);
+  const [isChangingStep, setIsChangingStep] = useState(false);
+  const [targetStep, setTargetStep] = useState<StudioStep | null>(null);
+  const [stepTransitionMsg, setStepTransitionMsg] = useState<string>('');
+
   const [clusters, setClusters] = useState<ClusterConnectionPublic[]>([]);
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
 
@@ -123,6 +136,32 @@ export function App() {
     };
   }, []);
 
+  // Dedicated smooth step navigation with loading state
+  const navigateToStep = useCallback(
+    async (nextStep: StudioStep, customAction?: () => Promise<void>) => {
+      if (nextStep === currentStep && !customAction) return;
+      setIsChangingStep(true);
+      setTargetStep(nextStep);
+      setStepTransitionMsg(STEP_TRANSITION_MESSAGES[nextStep] || 'Đang chuyển bước...');
+
+      try {
+        if (customAction) {
+          await customAction();
+        } else {
+          // Micro-pause for a buttery smooth visual transition
+          await new Promise((r) => setTimeout(r, 280));
+        }
+        setCurrentStep(nextStep);
+      } finally {
+        setTimeout(() => {
+          setIsChangingStep(false);
+          setTargetStep(null);
+        }, 120);
+      }
+    },
+    [currentStep]
+  );
+
   // Load namespaces & topology when a cluster is selected
   const loadClusterTopology = useCallback(
     async (cluster: ClusterConnectionPublic, targetNamespace?: string) => {
@@ -173,8 +212,9 @@ export function App() {
     setSelectedClusterId(clusterId);
     const cluster = clusters.find((c) => c.id === clusterId);
     if (cluster) {
-      await loadClusterTopology(cluster);
-      setCurrentStep(2);
+      await navigateToStep(2, async () => {
+        await loadClusterTopology(cluster);
+      });
     }
   };
 
@@ -214,24 +254,25 @@ export function App() {
         ? `${route.tlsEnabled ? 'https' : 'http'}://${route.host}`
         : selectedCluster.externalBaseUrl || 'https://localhost';
 
-    const saved = await handleSaveScenario({
-      clusterId: selectedCluster.id,
-      name: `[${protocol}] ${route.host}${route.path}`,
-      description: `Kịch bản kiểm thử thực tế cho Ingress ${route.ingressName} (${route.path} -> ${route.serviceName}:${route.servicePort})`,
-      protocol,
-      method: 'GET',
-      targetBaseUrl: baseUrl,
-      targetPath: route.path || '/',
-      headers: {},
-      virtualUsers: 20,
-      durationSeconds: 20,
-      rampUpSeconds: 5,
-      targetNamespace: selectedNamespace || 'default',
-      targetWorkload: workloadName,
-      safetyAbortMemoryPercent: 85,
+    await navigateToStep(3, async () => {
+      const saved = await handleSaveScenario({
+        clusterId: selectedCluster.id,
+        name: `[${protocol}] ${route.host}${route.path}`,
+        description: `Kịch bản kiểm thử thực tế cho Ingress ${route.ingressName} (${route.path} -> ${route.serviceName}:${route.servicePort})`,
+        protocol,
+        method: 'GET',
+        targetBaseUrl: baseUrl,
+        targetPath: route.path || '/',
+        headers: {},
+        virtualUsers: 20,
+        durationSeconds: 20,
+        rampUpSeconds: 5,
+        targetNamespace: selectedNamespace || 'default',
+        targetWorkload: workloadName,
+        safetyAbortMemoryPercent: 85,
+      });
+      setSelectedScenarioId(saved.id);
     });
-    setSelectedScenarioId(saved.id);
-    setCurrentStep(3);
   };
 
   const handleSaveScenario = async (
@@ -272,7 +313,7 @@ export function App() {
       }
       setActiveRun(data.run);
       // Small pause so the user visually sees the high-tech transition to Step 4
-      await new Promise((r) => setTimeout(r, 650));
+      await new Promise((r) => setTimeout(r, 600));
       setCurrentStep(4);
     } finally {
       setStartingRun(false);
@@ -303,7 +344,7 @@ export function App() {
     {
       id: 3,
       title: 'Bước 3: Thiết kế Kịch bản',
-      subtitle: `${clusterScenarios.length} kịch bản động`,
+      subtitle: `${clusterScenarios.length} kịch bản chuẩn`,
       icon: <Sliders className="w-4 h-4" />,
     },
     {
@@ -318,33 +359,41 @@ export function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col relative">
+      {/* Top Animated Loading Pulse Bar when Switching Steps */}
+      {isChangingStep && (
+        <div className="fixed top-0 left-0 right-0 h-1 z-50 overflow-hidden bg-slate-900">
+          <div className="h-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-emerald-400 animate-pulse w-full shadow-lg shadow-cyan-500/50" />
+        </div>
+      )}
+
       {/* Clean Top Bar */}
       <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <ShieldCheck className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-white tracking-tight">
+                <h1 className="text-sm font-bold text-white tracking-tight">
                   KubePulse Studio
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                  AES-256 Vault • 100% Real Traffic
+                <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  AES-256 Vault • Real Traffic
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Nền tảng Kiểm thử Chịu tải & Bảo mật Độc lập theo mô hình OpenLens / Rancher
+              <p className="text-[11px] text-slate-400">
+                Nền tảng Kiểm thử Chịu tải & Bảo mật K8s Pod Độc lập
               </p>
             </div>
           </div>
 
-          {/* 4-Step Progressive Navigation */}
+          {/* 4-Step Progressive Navigation with Loading States */}
           <nav className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {steps.map((step) => {
               const isActive = currentStep === step.id;
+              const isTarget = isChangingStep && targetStep === step.id;
               const isCompleted =
                 (step.id === 1 && selectedCluster !== null) ||
                 (step.id === 2 && topology !== null) ||
@@ -354,31 +403,38 @@ export function App() {
               return (
                 <button
                   key={step.id}
-                  onClick={() => setCurrentStep(step.id)}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition ${
+                  disabled={isChangingStep}
+                  onClick={() => navigateToStep(step.id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-left transition ${
                     isActive
-                      ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-sm'
+                      ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/30'
+                      : isTarget
+                      ? 'bg-cyan-950/40 border-cyan-400 text-cyan-200 animate-pulse'
                       : 'bg-slate-900/70 border-slate-800/90 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                   }`}
                 >
                   <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                      isActive
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                      isTarget
+                        ? 'bg-cyan-500 text-slate-950'
+                        : isActive
                         ? 'bg-indigo-600 text-white'
                         : isCompleted
                         ? 'bg-emerald-500/20 text-emerald-400'
                         : 'bg-slate-800 text-slate-400'
                     }`}
                   >
-                    {isCompleted && !isActive ? (
-                      <CheckCircle2 className="w-4 h-4" />
+                    {isTarget ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : isCompleted && !isActive ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                     ) : (
                       step.icon
                     )}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold truncate">{step.title}</div>
-                    <div className="text-[10px] text-slate-400 truncate">{step.subtitle}</div>
+                    <div className="text-[11px] font-semibold truncate">{step.title}</div>
+                    <div className="text-[9px] text-slate-400 truncate">{step.subtitle}</div>
                   </div>
                 </button>
               );
@@ -389,9 +445,9 @@ export function App() {
 
       {/* Global Error Notification */}
       {errorBanner && (
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-4">
-          <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 flex items-center justify-between gap-3 text-rose-200 text-xs">
-            <div className="flex items-center gap-2.5">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-3">
+          <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 flex items-center justify-between gap-3 text-rose-200 text-xs">
+            <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{errorBanner}</span>
             </div>
@@ -406,7 +462,8 @@ export function App() {
       )}
 
       {/* Main Step Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 relative">
+        {/* Step 1 */}
         {currentStep === 1 && (
           <Step1Connections
             clusters={clusters}
@@ -421,6 +478,7 @@ export function App() {
           />
         )}
 
+        {/* Step 2 */}
         {currentStep === 2 &&
           (selectedCluster ? (
             <Step2TopologyExplorer
@@ -436,25 +494,27 @@ export function App() {
                 loadClusterTopology(selectedCluster, selectedNamespace);
               }}
               onGenerateScenariosAndProceed={async () => {
-                await handleAutoGenerateScenarios();
-                setCurrentStep(3);
+                await navigateToStep(3, async () => {
+                  await handleAutoGenerateScenarios();
+                });
               }}
               onCreateScenarioForRoute={handleCreateScenarioForRoute}
             />
           ) : (
-            <div className="max-w-xl mx-auto py-16 text-center space-y-4">
-              <p className="text-sm text-slate-400">
+            <div className="max-w-xl mx-auto py-12 text-center space-y-3">
+              <p className="text-xs text-slate-400">
                 Vui lòng chọn hoặc thêm một Kết nối Hệ thống ở Bước 1 trước khi khám phá hạ tầng.
               </p>
               <button
-                onClick={() => setCurrentStep(1)}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
+                onClick={() => navigateToStep(1)}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
               >
                 Quay lại Bước 1
               </button>
             </div>
           ))}
 
+        {/* Step 3 */}
         {currentStep === 3 &&
           (selectedCluster ? (
             <Step3ScenarioStudio
@@ -470,19 +530,20 @@ export function App() {
               onRunScenarioAndProceed={handleRunScenarioAndProceed}
             />
           ) : (
-            <div className="max-w-xl mx-auto py-16 text-center space-y-4">
-              <p className="text-sm text-slate-400">
+            <div className="max-w-xl mx-auto py-12 text-center space-y-3">
+              <p className="text-xs text-slate-400">
                 Vui lòng chọn một Kết nối Hệ thống ở Bước 1 trước khi thiết kế kịch bản.
               </p>
               <button
-                onClick={() => setCurrentStep(1)}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
+                onClick={() => navigateToStep(1)}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
               >
                 Quay lại Bước 1
               </button>
             </div>
           ))}
 
+        {/* Step 4 */}
         {currentStep === 4 && (
           <Step4LiveMonitor
             activeRun={activeRun}
@@ -490,10 +551,29 @@ export function App() {
             onSelectRun={(run) => setActiveRun(run)}
             onStopRun={handleStopRun}
             onRerunScenario={handleRunScenarioAndProceed}
-            onBackToScenarios={() => setCurrentStep(3)}
+            onBackToScenarios={() => navigateToStep(3)}
           />
         )}
       </main>
+
+      {/* Smooth Step Transition Loading Overlay */}
+      {isChangingStep && (
+        <div className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 space-y-3 animate-in fade-in duration-150">
+          <div className="relative flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full border-3 border-cyan-500/20 border-t-cyan-400 animate-spin" />
+            <Sparkles className="w-5 h-5 text-cyan-400 absolute animate-pulse" />
+          </div>
+          <div className="text-center space-y-1">
+            <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center justify-center gap-1.5 font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              {targetStep ? `Đang chuyển sang Bước ${targetStep}...` : 'Đang xử lý...'}
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono">
+              {stepTransitionMsg}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Loading Overlay when starting and transitioning to Step 4 */}
       {startingRun && (
