@@ -1,5 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import * as crypto from 'node:crypto';
+import * as http from 'node:http';
+import * as https from 'node:https';
 import * as k8s from '@kubernetes/client-node';
 import WebSocket from 'ws';
 import {
@@ -18,6 +20,13 @@ import {
   parseK8sCpuToMillicores,
   parseK8sMemoryToMi,
 } from './k8sDiscoveryService.js';
+
+const keepAliveHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 1000 });
+const keepAliveHttpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 1000,
+  rejectUnauthorized: false,
+});
 
 function computePercentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
@@ -553,25 +562,65 @@ export class RealRunnerEngine {
       const t0 = performance.now();
       const reqBytes = effectiveBody ? Buffer.byteLength(effectiveBody, 'utf-8') : 0;
       try {
-        const reqInit: RequestInit = {
-          method: scenario.method || 'GET',
-          headers: scenario.headers || {},
-          signal,
-        };
-        if (effectiveBody && (scenario.method === 'POST' || scenario.method === 'PUT')) {
-          reqInit.body = effectiveBody;
-        }
-        const res = await fetch(url, reqInit);
-        const buf = await res.arrayBuffer().catch(() => new ArrayBuffer(0));
-        const elapsedMs = Math.round(performance.now() - t0);
-        onSample(elapsedMs, res.status, false, reqBytes + buf.byteLength);
+        const u = new URL(url);
+        const hostHeader = scenario.headers?.['Host'] || scenario.headers?.['host'];
+        const isHttps = u.protocol === 'https:';
+        const client = isHttps ? https : http;
+        const agent = isHttps ? keepAliveHttpsAgent : keepAliveHttpAgent;
+
+        await new Promise<void>((resolve) => {
+          const req = client.request(
+            {
+              protocol: u.protocol,
+              hostname: u.hostname,
+              port: u.port || (isHttps ? 443 : 80),
+              path: `${u.pathname}${u.search}`,
+              method: scenario.method || 'GET',
+              headers: scenario.headers || {},
+              servername: hostHeader || u.hostname,
+              agent,
+              rejectUnauthorized: false,
+              timeout: 8000,
+            },
+            (res) => {
+              let resLen = 0;
+              res.on('data', (d) => {
+                resLen += d.length;
+              });
+              res.on('end', () => {
+                const elapsedMs = Math.round(performance.now() - t0);
+                onSample(elapsedMs, res.statusCode || 0, false, reqBytes + resLen);
+                resolve();
+              });
+            }
+          );
+          req.on('error', () => {
+            if (!signal.aborted) {
+              const elapsedMs = Math.round(performance.now() - t0);
+              onSample(elapsedMs, 0, true, reqBytes);
+            }
+            resolve();
+          });
+          req.on('timeout', () => {
+            req.destroy();
+            if (!signal.aborted) {
+              const elapsedMs = Math.round(performance.now() - t0);
+              onSample(elapsedMs, 0, true, reqBytes);
+            }
+            resolve();
+          });
+          if (effectiveBody && (scenario.method === 'POST' || scenario.method === 'PUT')) {
+            req.write(effectiveBody);
+          }
+          req.end();
+        });
       } catch {
         if (signal.aborted) break;
         const elapsedMs = Math.round(performance.now() - t0);
         onSample(elapsedMs, 0, true, reqBytes);
       }
 
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 40));
     }
   }
 
@@ -602,11 +651,14 @@ export class RealRunnerEngine {
         };
 
         try {
-          const ws = new WebSocket(wsUrl, {
+          const hostHeader = scenario.headers?.['Host'] || scenario.headers?.['host'];
+          const wsOptions: any = {
             headers: scenario.headers || {},
-            handshakeTimeout: 4000,
+            handshakeTimeout: 5000,
             rejectUnauthorized: false,
-          });
+            ...(hostHeader ? { servername: hostHeader } : {}),
+          };
+          const ws = new WebSocket(wsUrl, wsOptions);
           this.activeSockets.add(ws);
 
           ws.on('open', () => {
