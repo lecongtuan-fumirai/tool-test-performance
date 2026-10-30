@@ -111,6 +111,7 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
   const ext = latestTick?.external;
   const k8s = latestTick?.internal;
   const memPct = k8s?.memoryUsagePercent ?? null;
+  const cpuPct = k8s?.cpuUsagePercent ?? null;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -315,12 +316,12 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
         )}
       </div>
 
-      {/* 4 Clean Real-Time KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 5 Clean Real-Time KPI Cards (Including CPU & RAM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Card 1: Real Traffic */}
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Lưu lượng Thực tế (Outside-In)</span>
+            <span>Lưu lượng Thực tế</span>
             <Activity className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="flex items-baseline gap-2">
@@ -329,10 +330,10 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
           </div>
           <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
             <span>
-              Tổng đã gửi: <strong className="text-slate-200">{ext?.totalRequests || 0}</strong>
+              Tổng: <strong className="text-slate-200">{ext?.totalRequests || 0}</strong>
             </span>
             <span>
-              Workers: <strong className="text-indigo-300">{ext?.activeWorkers || 0}</strong>
+              Users: <strong className="text-indigo-300">{ext?.activeWorkers || 0}</strong>
             </span>
           </div>
         </div>
@@ -340,7 +341,7 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
         {/* Card 2: Real Latency */}
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Độ trễ Phản hồi Thực (p95)</span>
+            <span>Độ trễ Phản hồi (p95)</span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
           <div className="flex items-baseline gap-2">
@@ -352,7 +353,7 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
               p50: <strong className="text-slate-200">{ext?.latencyP50Ms || 0} ms</strong>
             </span>
             <span>
-              Trung bình: <strong className="text-slate-200">{ext?.latencyAvgMs || 0} ms</strong>
+              TB: <strong className="text-slate-200">{ext?.latencyAvgMs || 0} ms</strong>
             </span>
           </div>
         </div>
@@ -360,42 +361,42 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
         {/* Card 3: Real HTTP/WS Status Codes */}
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Phân bổ Mã Phản hồi Thật</span>
+            <span>Phân bổ Mã Trả về</span>
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-xs">
-            <div className="px-2 py-1 rounded bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 flex justify-between">
-              <span>2xx OK:</span>
+          <div className="grid grid-cols-2 gap-1 pt-0.5 text-xs">
+            <div className="px-1.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 flex justify-between">
+              <span>2xx:</span>
               <strong>{ext?.status2xx || 0}</strong>
             </div>
-            <div className="px-2 py-1 rounded bg-amber-950/40 border border-amber-500/20 text-amber-300 flex justify-between">
-              <span>429 Chặn:</span>
+            <div className="px-1.5 py-0.5 rounded bg-amber-950/40 border border-amber-500/20 text-amber-300 flex justify-between">
+              <span>429:</span>
               <strong>{ext?.status429 || 0}</strong>
             </div>
-            <div className="px-2 py-1 rounded bg-indigo-950/40 border border-indigo-500/20 text-indigo-300 flex justify-between">
-              <span>401/403:</span>
+            <div className="px-1.5 py-0.5 rounded bg-indigo-950/40 border border-indigo-500/20 text-indigo-300 flex justify-between">
+              <span>Auth:</span>
               <strong>{ext?.status401_403 || 0}</strong>
             </div>
-            <div className="px-2 py-1 rounded bg-rose-950/40 border border-rose-500/20 text-rose-300 flex justify-between">
-              <span>5xx/Lỗi:</span>
+            <div className="px-1.5 py-0.5 rounded bg-rose-950/40 border border-rose-500/20 text-rose-300 flex justify-between">
+              <span>5xx:</span>
               <strong>{(ext?.status5xx || 0) + (ext?.networkErrors || 0)}</strong>
             </div>
           </div>
         </div>
 
-        {/* Card 4: Real Inside-Out K8s Pod Metrics */}
+        {/* Card 4: RAM Pod K8s */}
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Sức khỏe Pod Thật (Inside-Out)</span>
+            <span>RAM Pod K8s Thật</span>
             <HardDrive className="w-4 h-4 text-sky-400" />
           </div>
           {k8s && k8s.metricsAvailable ? (
             <>
               <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline gap-1.5">
+                <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-white">{k8s.totalMemoryMi ?? 0}</span>
-                  <span className="text-xs text-slate-400">
-                    / {k8s.memoryLimitMi ? `${k8s.memoryLimitMi} MiB` : 'Không giới hạn'}
+                  <span className="text-xs text-slate-400 truncate max-w-[80px]">
+                    / {k8s.memoryLimitMi ? `${k8s.memoryLimitMi}M` : 'No Limit'}
                   </span>
                 </div>
                 {memPct !== null && (
@@ -408,27 +409,102 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                         : 'bg-emerald-500/20 text-emerald-300'
                     }`}
                   >
-                    {memPct}% RAM
+                    {memPct}%
                   </span>
                 )}
               </div>
+              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    (memPct ?? 0) >= 85
+                      ? 'bg-rose-500'
+                      : (memPct ?? 0) >= 70
+                      ? 'bg-amber-500'
+                      : 'bg-sky-500'
+                  }`}
+                  style={{ width: `${Math.min(100, memPct ?? 0)}%` }}
+                />
+              </div>
               <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
-                <span className="truncate max-w-[140px]" title={k8s.primaryPodName}>
+                <span className="truncate max-w-[120px]" title={k8s.primaryPodName}>
                   Pod: <strong className="text-slate-200">{k8s.primaryPodName}</strong>
                 </span>
+                <span className="text-emerald-400 text-[10px]">{k8s.podPhase}</span>
+              </div>
+            </>
+          ) : (
+            <div className="text-xs text-slate-400 py-1 space-y-1">
+              <div>
+                Pod: <strong className="text-slate-200">{k8s?.primaryPodName || 'N/A'}</strong>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Chờ K8s Metrics Server...
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Card 5: CPU Pod K8s */}
+        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>CPU Pod K8s Thật</span>
+            <Cpu className="w-4 h-4 text-amber-400" />
+          </div>
+          {k8s && k8s.metricsAvailable ? (
+            <>
+              <div className="flex items-baseline justify-between">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-white">{k8s.totalCpuMillicores ?? 0}m</span>
+                  <span className="text-xs text-slate-400 truncate max-w-[80px]">
+                    / {k8s.cpuLimitMillicores ? `${k8s.cpuLimitMillicores}m` : 'No Limit'}
+                  </span>
+                </div>
+                {cpuPct !== null ? (
+                  <span
+                    className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                      cpuPct >= 85
+                        ? 'bg-rose-500/20 text-rose-300'
+                        : cpuPct >= 70
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}
+                  >
+                    {cpuPct}%
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                    {k8s.totalCpuMillicores ?? 0}m
+                  </span>
+                )}
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    (cpuPct ?? 0) >= 85
+                      ? 'bg-rose-500'
+                      : (cpuPct ?? 0) >= 70
+                      ? 'bg-amber-500'
+                      : 'bg-amber-400'
+                  }`}
+                  style={{ width: `${Math.min(100, cpuPct ?? 0)}%` }}
+                />
+              </div>
+              <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
                 <span>
-                  CPU: <strong className="text-sky-300">{k8s.totalCpuMillicores ?? 0}m</strong>
+                  Đỉnh: <strong className="text-amber-300">{Math.max(...currentRun.ticks.map((t) => t.internal.totalCpuMillicores || 0), k8s.totalCpuMillicores || 0)}m</strong>
+                </span>
+                <span>
+                  Replicas: <strong className="text-slate-200">{k8s.podCount || 1}</strong>
                 </span>
               </div>
             </>
           ) : (
             <div className="text-xs text-slate-400 py-1 space-y-1">
               <div>
-                Pod: <strong className="text-slate-200">{k8s?.primaryPodName || 'N/A'}</strong> (
-                {k8s?.podPhase || 'External'})
+                CPU: <strong className="text-slate-200">{k8s?.totalCpuMillicores !== null && k8s?.totalCpuMillicores !== undefined ? `${k8s.totalCpuMillicores}m` : 'N/A'}</strong>
               </div>
               <div className="text-[11px] text-slate-500">
-                Chế độ External URL hoặc Metrics Server đang cập nhật...
+                Chờ K8s Metrics Server...
               </div>
             </div>
           )}
@@ -553,7 +629,7 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Biểu đồ Đối chiếu Thời gian thực: Độ trễ p95 (ms) & Pod RAM (MiB)
+                    Biểu đồ Đối chiếu Thời gian thực: Độ trễ p95 (ms) & Pod RAM / CPU
                   </h4>
                   <span className="text-[11px] text-slate-400">
                     {currentRun.ticks.length} mẫu đo (1 giây / mẫu)
@@ -565,41 +641,66 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                     Đang đợi mẫu đo đầu tiên...
                   </div>
                 ) : (
-                  <div className="h-48 flex items-end gap-1.5 pt-6 pb-2 px-3 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto">
-                    {currentRun.ticks.slice(-45).map((tick) => {
-                      const maxLatency = Math.max(
-                        ...currentRun.ticks.map((t) => t.external.latencyP95Ms),
-                        100
-                      );
-                      const latencyHeightPct = Math.min(
-                        100,
-                        Math.max(6, Math.round((tick.external.latencyP95Ms / maxLatency) * 100))
-                      );
-                      return (
-                        <div
-                          key={tick.elapsedSeconds}
-                          className="flex-1 min-w-[14px] flex flex-col items-center gap-1 group relative"
-                        >
-                          <div className="w-full h-32 flex items-end justify-center gap-0.5">
-                            <div
-                              className={`w-full rounded-t transition-all ${
-                                tick.external.status5xx > 0
-                                  ? 'bg-rose-500'
-                                  : tick.external.status429 > 0
-                                  ? 'bg-amber-400'
-                                  : 'bg-indigo-500'
-                              }`}
-                              style={{ height: `${latencyHeightPct}%` }}
-                              title={`Giây ${tick.elapsedSeconds}s: p95=${tick.external.latencyP95Ms}ms, RPS=${tick.external.requestsPerSec}, RAM=${tick.internal.totalMemoryMi ?? 0}MiB`}
-                            />
+                  <>
+                    <div className="h-48 flex items-end gap-1.5 pt-6 pb-2 px-3 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto">
+                      {currentRun.ticks.slice(-45).map((tick) => {
+                        const maxLatency = Math.max(
+                          ...currentRun.ticks.map((t) => t.external.latencyP95Ms),
+                          100
+                        );
+                        const latencyHeightPct = Math.min(
+                          100,
+                          Math.max(6, Math.round((tick.external.latencyP95Ms / maxLatency) * 100))
+                        );
+                        return (
+                          <div
+                            key={tick.elapsedSeconds}
+                            className="flex-1 min-w-[14px] flex flex-col items-center gap-1 group relative"
+                          >
+                            <div className="w-full h-32 flex items-end justify-center gap-0.5">
+                              <div
+                                className={`w-full rounded-t transition-all ${
+                                  tick.external.status5xx > 0
+                                    ? 'bg-rose-500'
+                                    : tick.external.status429 > 0
+                                    ? 'bg-amber-400'
+                                    : 'bg-indigo-500'
+                                }`}
+                                style={{ height: `${latencyHeightPct}%` }}
+                                title={`Giây ${tick.elapsedSeconds}s: p95=${tick.external.latencyP95Ms}ms | RPS=${tick.external.requestsPerSec} | RAM=${tick.internal.totalMemoryMi ?? 0}MiB (${tick.internal.memoryUsagePercent ?? 0}%) | CPU=${tick.internal.totalCpuMillicores ?? 0}m (${tick.internal.cpuUsagePercent ?? 0}%)`}
+                              />
+                            </div>
+                            <span className="text-[9px] text-slate-500 font-mono">
+                              {tick.elapsedSeconds}s
+                            </span>
                           </div>
-                          <span className="text-[9px] text-slate-500 font-mono">
-                            {tick.elapsedSeconds}s
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400">Độ trễ p95 đỉnh:</span>
+                        <strong className="text-amber-300 font-mono">
+                          {Math.max(...currentRun.ticks.map((t) => t.external.latencyP95Ms), 0)} ms
+                        </strong>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400">Đỉnh RAM Pod:</span>
+                        <strong className="text-sky-300 font-mono">
+                          {Math.max(...currentRun.ticks.map((t) => t.internal.totalMemoryMi || 0), 0)} MiB
+                          {k8s?.memoryLimitMi ? ` / ${k8s.memoryLimitMi}M` : ''}
+                        </strong>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400">Đỉnh CPU Pod:</span>
+                        <strong className="text-amber-300 font-mono">
+                          {Math.max(...currentRun.ticks.map((t) => t.internal.totalCpuMillicores || 0), 0)}m
+                          {k8s?.cpuLimitMillicores ? ` / ${k8s.cpuLimitMillicores}m` : ''}
+                        </strong>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 

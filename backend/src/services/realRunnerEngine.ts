@@ -264,6 +264,7 @@ export class RealRunnerEngine {
       initialSnapshot.workloads[0];
 
     const memoryLimitMi = matchedWorkload?.memoryLimitMi ?? null;
+    const cpuLimitMillicores = matchedWorkload?.cpuLimitMillicores ?? null;
     const thresholdMemoryMi =
       memoryLimitMi !== null
         ? Math.round((memoryLimitMi * scenario.safetyAbortMemoryPercent) / 100)
@@ -280,7 +281,8 @@ export class RealRunnerEngine {
       cluster,
       scenario.targetNamespace,
       matchedWorkload?.name,
-      memoryLimitMi
+      memoryLimitMi,
+      cpuLimitMillicores
     );
 
     const baseVu = Math.max(1, Math.min(500, scenario.virtualUsers));
@@ -487,7 +489,8 @@ export class RealRunnerEngine {
         cluster,
         scenario.targetNamespace,
         matchedWorkload?.name || scenario.targetWorkload,
-        memoryLimitMi
+        memoryLimitMi,
+        cpuLimitMillicores
       );
 
       const tick: LiveRunTick = {
@@ -874,7 +877,8 @@ export class RealRunnerEngine {
     cluster: ClusterConnection,
     namespace: string,
     targetWorkload: string | undefined,
-    memoryLimitMi: number | null
+    memoryLimitMi: number | null,
+    cpuLimitMillicores: number | null = null
   ): Promise<LiveRunTick['internal']> {
     if (cluster.connectionType === 'external-url') {
       return {
@@ -883,6 +887,8 @@ export class RealRunnerEngine {
         primaryPodName: 'Chế độ External URL (Không kết nối K8s)',
         podPhase: 'External',
         totalCpuMillicores: null,
+        cpuLimitMillicores: null,
+        cpuUsagePercent: null,
         totalMemoryMi: null,
         memoryLimitMi: null,
         memoryUsagePercent: null,
@@ -911,6 +917,8 @@ export class RealRunnerEngine {
           primaryPodName: 'Không tìm thấy Pod trong namespace',
           podPhase: 'None',
           totalCpuMillicores: null,
+          cpuLimitMillicores,
+          cpuUsagePercent: null,
           totalMemoryMi: null,
           memoryLimitMi,
           memoryUsagePercent: null,
@@ -1022,12 +1030,19 @@ export class RealRunnerEngine {
           ? Math.round((totalMemoryMi / memoryLimitMi) * 100)
           : null;
 
+      const cpuUsagePercent =
+        totalCpuMillicores !== null && cpuLimitMillicores !== null && cpuLimitMillicores > 0
+          ? Math.round((totalCpuMillicores / cpuLimitMillicores) * 100)
+          : null;
+
       return {
         metricsAvailable,
         podCount: podsToInspect.length,
         primaryPodName,
         podPhase,
         totalCpuMillicores,
+        cpuLimitMillicores,
+        cpuUsagePercent,
         totalMemoryMi,
         memoryLimitMi,
         memoryUsagePercent,
@@ -1043,6 +1058,8 @@ export class RealRunnerEngine {
         primaryPodName: 'Lỗi đọc K8s API',
         podPhase: 'Unknown',
         totalCpuMillicores: null,
+        cpuLimitMillicores,
+        cpuUsagePercent: null,
         totalMemoryMi: null,
         memoryLimitMi,
         memoryUsagePercent: null,
@@ -1342,6 +1359,14 @@ export class RealRunnerEngine {
       (m, t) => Math.max(m, t.internal.memoryUsagePercent || 0),
       0
     );
+    const maxCpuMilli = ticks.reduce(
+      (m, t) => Math.max(m, t.internal.totalCpuMillicores || 0),
+      0
+    );
+    const maxCpuPct = ticks.reduce(
+      (m, t) => Math.max(m, t.internal.cpuUsagePercent || 0),
+      0
+    );
 
     const insights = run.specializedInsights;
     const recs: string[] = [];
@@ -1366,6 +1391,12 @@ export class RealRunnerEngine {
       grade = 'B';
       recs.push(
         `Độ trễ thực tế p95 đạt đỉnh ${maxP95}ms (> 1 giây). Khuyến nghị kiểm tra cấu hình CPU/Memory hoặc tối ưu truy vấn.`
+      );
+    }
+
+    if (maxCpuPct >= 85) {
+      recs.push(
+        `[Hiệu năng CPU - Cảnh báo CFS Throttling]: CPU Pod đạt đỉnh ${maxCpuMilli}m (${maxCpuPct}% mức trần ${run.latestTick.internal.cpuLimitMillicores}m). Khuyến nghị nâng resources.limits.cpu hoặc cấu hình HPA mở rộng theo CPU utilization.`
       );
     }
 
@@ -1433,10 +1464,19 @@ export class RealRunnerEngine {
       run.latestTick.internal.totalMemoryMi !== null
         ? `${run.latestTick.internal.totalMemoryMi} MiB${
             run.latestTick.internal.memoryLimitMi
-              ? ` / ${run.latestTick.internal.memoryLimitMi} MiB (${maxMemPct}%)`
+              ? ` / ${run.latestTick.internal.memoryLimitMi} MiB (${maxMemPct || run.latestTick.internal.memoryUsagePercent || 0}%)`
               : ''
           }`
-        : 'Chưa có số liệu từ K8s Metrics Server';
+        : 'N/A';
+
+    const lastCpuStr =
+      run.latestTick.internal.totalCpuMillicores !== null
+        ? `${run.latestTick.internal.totalCpuMillicores}m${
+            run.latestTick.internal.cpuLimitMillicores
+              ? ` / ${run.latestTick.internal.cpuLimitMillicores}m (${maxCpuPct || run.latestTick.internal.cpuUsagePercent || 0}%)`
+              : ''
+          }`
+        : 'N/A';
 
     return {
       grade,
@@ -1445,11 +1485,11 @@ export class RealRunnerEngine {
         : run.safetyBreaker.tripped
         ? `⚡ Đã ngắt an toàn bởi Cầu chì Tự động khi RAM chạm ${run.latestTick.internal.totalMemoryMi} MiB`
         : customStopNote ||
-          `Hoàn tất [${run.testType || 'LOAD_TEST'}] trên ${run.targetUrl}: Tổng ${totalReq} yêu cầu, Độ trễ p95 cao nhất ${maxP95}ms, RAM Pod ${lastMemStr}`,
+          `Hoàn tất [${run.testType || 'LOAD_TEST'}] trên ${run.targetUrl}: Tổng ${totalReq} yêu cầu, p95=${maxP95}ms, RAM Pod ${lastMemStr}, CPU Pod ${lastCpuStr}`,
       nonTechSummaryVi: run.latestTick.internal.oomKilledDetected
         ? `CẢNH BÁO ĐỎ: Pod ứng dụng trên Kubernetes đã bị hệ điều hành tiêu diệt (OOMKilled - Exit Code 137) do tiêu thụ vượt trần RAM (${lastMemStr}). Đã xác nhận điểm sụp đổ hoàn toàn của hệ thống.`
-        : `Trong phiên kiểm thử [${run.testType || 'LOAD_TEST'}] (từ ${run.virtualUsers} đến ${run.peakVirtualUsers || run.virtualUsers} người dùng đồng thời) vào ${run.targetUrl}, máy chủ đã xử lý thành công ${total2xx}/${totalReq} yêu cầu (chặn quá tải 429: ${total429}, lỗi: ${total5xx}). Độ trễ phản hồi thực tế (p95) là ${maxP95}ms và mức tiêu thụ RAM của máy chủ trên K8s là ${lastMemStr}.`,
-      engineerSummary: `Type=${run.testType || 'LOAD_TEST'} | Target=${run.targetUrl} | TotalReq=${totalReq} (2xx=${total2xx}, 429=${total429}, 5xx/Err=${total5xx}) | Max_p95=${maxP95}ms | Pod_RAM=${lastMemStr} | OOMKilled=${Boolean(run.latestTick.internal.oomKilledDetected)}`,
+        : `Trong phiên kiểm thử [${run.testType || 'LOAD_TEST'}] (từ ${run.virtualUsers} đến ${run.peakVirtualUsers || run.virtualUsers} người dùng đồng thời) vào ${run.targetUrl}, máy chủ đã xử lý thành công ${total2xx}/${totalReq} yêu cầu (chặn quá tải 429: ${total429}, lỗi: ${total5xx}). Độ trễ phản hồi thực tế (p95) là ${maxP95}ms, mức tiêu thụ RAM là ${lastMemStr} và CPU là ${lastCpuStr}.`,
+      engineerSummary: `Type=${run.testType || 'LOAD_TEST'} | Target=${run.targetUrl} | TotalReq=${totalReq} (2xx=${total2xx}, 429=${total429}, 5xx/Err=${total5xx}) | Max_p95=${maxP95}ms | Pod_RAM=${lastMemStr} | Pod_CPU=${lastCpuStr} | OOMKilled=${Boolean(run.latestTick.internal.oomKilledDetected)}`,
       recommendationsVi: recs,
     };
   }

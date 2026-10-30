@@ -166,6 +166,8 @@ export interface LiveRunTick {
     primaryPodName: string;
     podPhase: string;
     totalCpuMillicores: number | null;
+    cpuLimitMillicores: number | null;
+    cpuUsagePercent: number | null;
     totalMemoryMi: number | null;
     memoryLimitMi: number | null;
     memoryUsagePercent: number | null;
