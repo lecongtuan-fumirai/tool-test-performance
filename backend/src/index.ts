@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
+import path from 'node:path';
+import fs from 'node:fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { storageRepo } from './storage/repository.js';
 import { k8sDiscoveryService } from './services/k8sDiscoveryService.js';
@@ -255,9 +257,29 @@ app.post('/api/runs/stop', (_req, res) => {
   res.json({ run });
 });
 
+// Serve frontend static build if available (supports single Web Service deployment on Render/Docker)
+const possibleFrontendPaths = [
+  path.resolve(process.cwd(), '../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(process.cwd(), 'public'),
+];
+for (const p of possibleFrontendPaths) {
+  if (fs.existsSync(p)) {
+    app.use(express.static(p));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+        return next();
+      }
+      res.sendFile(path.join(p, 'index.html'));
+    });
+    break;
+  }
+}
+
 const PORT = Number(process.env.PORT) || 3335;
-server.listen(PORT, '127.0.0.1', () => {
+const HOST = process.env.HOST || '0.0.0.0';
+server.listen(PORT, HOST, () => {
   console.log(
-    `[KubePulse Backend] Listening on http://127.0.0.1:${PORT} (WS: ws://127.0.0.1:${PORT}/ws/studio)`
+    `[KubePulse Backend] Listening on http://${HOST}:${PORT} (WS: ws://${HOST}:${PORT}/ws/studio)`
   );
 });

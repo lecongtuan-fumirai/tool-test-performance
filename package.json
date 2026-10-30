@@ -13,6 +13,7 @@
     "dev:fe": "pnpm --filter @kubepulse/frontend run dev",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
+    "start": "pnpm --filter @kubepulse/backend run start",
     "start:be": "pnpm --filter @kubepulse/backend run start"
   }
 }
