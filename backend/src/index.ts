@@ -1,5 +1,5 @@
-// Optimize libuv thread pool for high-concurrency performance testing runner
-process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '64';
+// Optimize libuv thread pool for high-concurrency performance testing runner (1000+ sockets)
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '128';
 
 import express from 'express';
 import cors from 'cors';
@@ -18,6 +18,7 @@ app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
 const server = http.createServer(app);
+server.maxConnections = 10000;
 const wss = new WebSocketServer({ server, path: '/ws/studio' });
 
 function broadcastRunUpdate(run: TestRunRecord) {

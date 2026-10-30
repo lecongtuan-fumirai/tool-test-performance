@@ -278,18 +278,18 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
     }
 
     if (selectedType === 'LOAD_TEST') {
-      setVirtualUsers(50);
-      setPeakVirtualUsers(50);
+      setVirtualUsers(100);
+      setPeakVirtualUsers(100);
       setDurationSeconds(25);
       setRampUpSeconds(5);
     } else if (selectedType === 'STRESS_TEST') {
-      setVirtualUsers(30);
-      setPeakVirtualUsers(300);
-      setDurationSeconds(30);
+      setVirtualUsers(100);
+      setPeakVirtualUsers(1000);
+      setDurationSeconds(35);
       setRampUpSeconds(5);
     } else if (selectedType === 'SPIKE_TEST') {
-      setVirtualUsers(20);
-      setPeakVirtualUsers(200);
+      setVirtualUsers(50);
+      setPeakVirtualUsers(1000);
       setDurationSeconds(25);
       setRampUpSeconds(2);
     }
@@ -599,12 +599,27 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
             <input
               type="range"
               min={1}
-              max={300}
+              max={1000}
+              step={5}
               value={virtualUsers}
               onChange={(e) => setVirtualUsers(Number(e.target.value))}
               className="w-full accent-cyan-400 cursor-pointer"
             />
-            <div className="text-[10px] text-slate-400 font-mono">Người dùng gửi request đồng thời</div>
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-0.5">
+              <span>Đồng thời (max 1000)</span>
+              <div className="flex gap-1">
+                {[100, 300, 500, 1000].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVirtualUsers(v)}
+                    className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 hover:border-cyan-400 text-[9px] text-slate-300"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Peak VUs */}
@@ -621,7 +636,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               <input
                 type="range"
                 min={virtualUsers}
-                max={800}
+                max={2000}
                 step={10}
                 value={peakVirtualUsers}
                 onChange={(e) => setPeakVirtualUsers(Number(e.target.value))}
@@ -630,7 +645,23 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
             ) : (
               <div className="h-6 flex items-center text-[10px] text-slate-400 font-mono">Duy trì mức ổn định</div>
             )}
-            <div className="text-[10px] text-slate-400 font-mono">Ngưỡng áp lực lớn nhất thử nghiệm</div>
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-0.5">
+              <span>Đỉnh tải (max 2000)</span>
+              {showPeak && (
+                <div className="flex gap-1">
+                  {[300, 500, 1000, 1500].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setPeakVirtualUsers(v)}
+                      className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 hover:border-rose-400 text-[9px] text-slate-300"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Duration */}

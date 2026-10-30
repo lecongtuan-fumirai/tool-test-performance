@@ -21,10 +21,11 @@ import {
   parseK8sMemoryToMi,
 } from './k8sDiscoveryService.js';
 
-const keepAliveHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 1000 });
+const keepAliveHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 5000, maxFreeSockets: 500 });
 const keepAliveHttpsAgent = new https.Agent({
   keepAlive: true,
-  maxSockets: 1000,
+  maxSockets: 5000,
+  maxFreeSockets: 500,
   rejectUnauthorized: false,
 });
 
@@ -285,10 +286,10 @@ export class RealRunnerEngine {
       cpuLimitMillicores
     );
 
-    const baseVu = Math.max(1, Math.min(500, scenario.virtualUsers));
+    const baseVu = Math.max(1, Math.min(2000, scenario.virtualUsers));
     const peakVu = Math.max(
       baseVu,
-      Math.min(1000, scenario.peakVirtualUsers || baseVu)
+      Math.min(2500, scenario.peakVirtualUsers || baseVu)
     );
 
     const initialTick: LiveRunTick = {
@@ -552,8 +553,8 @@ export class RealRunnerEngine {
     signal: AbortSignal,
     onSample: (latMs: number, statusCode: number, isNetErr: boolean, bytes: number) => void
   ): Promise<void> {
-    // Stagger initial worker startup slightly over 200ms to avoid artificial thundering herd at t=0
-    await new Promise((r) => setTimeout(r, (workerIdx % 20) * 10));
+    // Stagger worker startup across 1000ms for 1000+ concurrent sockets to avoid TCP SYN drop
+    await new Promise((r) => setTimeout(r, (workerIdx % 100) * 10));
 
     while (!signal.aborted) {
       if (workerIdx >= getAllowedVu()) {
@@ -635,7 +636,8 @@ export class RealRunnerEngine {
     signal: AbortSignal,
     onSample: (latMs: number, bucket: '2xx' | '401_403' | '429' | 'err') => void
   ): Promise<void> {
-    await new Promise((r) => setTimeout(r, (workerIdx % 20) * 15));
+    // Stagger worker startup across 1000ms for 1000+ concurrent sockets
+    await new Promise((r) => setTimeout(r, (workerIdx % 100) * 10));
 
     while (!signal.aborted) {
       if (workerIdx >= getAllowedVu()) {
@@ -655,9 +657,11 @@ export class RealRunnerEngine {
 
         try {
           const hostHeader = scenario.headers?.['Host'] || scenario.headers?.['host'];
+          const isWss = wsUrl.startsWith('wss:');
           const wsOptions: any = {
+            agent: isWss ? keepAliveHttpsAgent : keepAliveHttpAgent,
             headers: scenario.headers || {},
-            handshakeTimeout: 5000,
+            handshakeTimeout: 10000,
             rejectUnauthorized: false,
             ...(hostHeader ? { servername: hostHeader } : {}),
           };
