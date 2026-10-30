@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 3330,
     host: '0.0.0.0',
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:3335',
@@ -20,6 +21,7 @@ export default defineConfig({
   preview: {
     port: Number(process.env.PORT) || 3330,
     host: '0.0.0.0',
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:3335',
