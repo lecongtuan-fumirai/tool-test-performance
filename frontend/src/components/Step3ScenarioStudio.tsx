@@ -18,6 +18,7 @@ import {
   Shield,
   ChevronDown,
   ChevronUp,
+  Info,
 } from 'lucide-react';
 import {
   ClusterConnectionPublic,
@@ -48,49 +49,89 @@ export const TEST_TYPE_CATALOG: Array<{
   badgeLabel: string;
   subtitle: string;
   purpose: string;
-  flowDescription: string;
+  whenToUse: string;
+  curveShape: 'trapezoid' | 'staircase' | 'spike';
   accentBorder: string;
   activeBg: string;
+  activeBorder: string;
   textColor: string;
   icon: React.ReactNode;
 }> = [
-  {
-    type: 'LOAD_TEST',
-    title: '1. Load Test',
-    badgeLabel: 'Baseline SLA',
-    subtitle: 'Tải Ổn định Dự kiến',
-    purpose: 'Kiểm tra hoạt động ở tải mục tiêu, đối chiếu SLA p95 Latency và RAM/CPU Pod.',
-    flowDescription: 'Bơm dòng traffic đều đặn qua Ingress vào Pod. Đo lường SLA cam kết dưới tải thông thường.',
-    accentBorder: 'border-cyan-500',
-    activeBg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/50',
-    textColor: 'text-cyan-400',
-    icon: <Activity className="w-4 h-4 text-cyan-400" />,
-  },
-  {
-    type: 'STRESS_TEST',
-    title: '2. Stress Test',
-    badgeLabel: 'Breaking Point',
-    subtitle: 'Tìm Điểm Gãy Bậc Thang',
-    purpose: 'Tăng tải 5 nấc liên tục vượt ngưỡng để tìm chính xác điểm gãy (429, 5xx, hoặc OOM).',
-    flowDescription: 'Leo bậc thang 5 nấc ép tải. Kiểm tra xem Cloudflare/Traefik cắt 429 hay Pod bị cạn CPU/RAM trước.',
-    accentBorder: 'border-rose-500',
-    activeBg: 'bg-rose-500/15 text-rose-300 border-rose-500/50',
-    textColor: 'text-rose-400',
-    icon: <Flame className="w-4 h-4 text-rose-400" />,
-  },
-  {
-    type: 'SPIKE_TEST',
-    title: '3. Spike Test',
-    badgeLabel: '10x Flash Sale',
-    subtitle: 'Sốc Tải & Đo Hồi Phục',
-    purpose: 'Tải nền thấp đột ngột vọt 10x tức thì rồi hạ để đo Thời gian tự phục hồi (Recovery Time).',
-    flowDescription: 'Bơm xung tải tức thì 10x (Flash Sale) rồi ngắt đột ngột để kiểm tra xả nghẽn hàng đợi và tự phục hồi.',
-    accentBorder: 'border-amber-500',
-    activeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/50',
-    textColor: 'text-amber-400',
-    icon: <Zap className="w-4 h-4 text-amber-400" />,
-  },
-];
+    {
+      type: 'LOAD_TEST',
+      title: '1. Load Testing',
+      badgeLabel: 'Baseline SLA',
+      subtitle: 'Tải Ổn Định Dự Kiến',
+      purpose: 'Kiểm tra hệ thống chạy ổn định ở mức tải cam kết thường ngày, đối chiếu SLA p95 và RAM/CPU nền.',
+      whenToUse: 'Dùng để nghiệm thu định kỳ & kiểm tra cam kết SLA với khách hàng.',
+      curveShape: 'trapezoid',
+      accentBorder: 'border-cyan-500/40',
+      activeBg: 'bg-cyan-950/40',
+      activeBorder: 'border-cyan-400',
+      textColor: 'text-cyan-400',
+      icon: <Activity className="w-4 h-4 text-cyan-400" />,
+    },
+    {
+      type: 'STRESS_TEST',
+      title: '2. Stress Testing',
+      badgeLabel: 'Breaking Point',
+      subtitle: 'Tìm Điểm Gãy Bậc Thang',
+      purpose: 'Tăng tải 5 nấc liên tục vượt ngưỡng chịu đựng để tìm chính xác giới hạn nghẽn hoặc sập (429, 5xx, OOM).',
+      whenToUse: 'Dùng để xác định điểm giới hạn và thiết lập quy tắc tự động co giãn HPA.',
+      curveShape: 'staircase',
+      accentBorder: 'border-rose-500/40',
+      activeBg: 'bg-rose-950/40',
+      activeBorder: 'border-rose-400',
+      textColor: 'text-rose-400',
+      icon: <Flame className="w-4 h-4 text-rose-400" />,
+    },
+    {
+      type: 'SPIKE_TEST',
+      title: '3. Spike Testing',
+      badgeLabel: '10x Flash Sale',
+      subtitle: 'Sốc Tải & Đo Tự Phục Hồi',
+      purpose: 'Đang chạy tải nền thấp thì tăng vọt 10x đột ngột trong vài giây rồi hạ để đo thời gian hồi phục (Recovery Time).',
+      whenToUse: 'Dùng trước các sự kiện mở bán Flash Sale hoặc chiến dịch Marketing lớn.',
+      curveShape: 'spike',
+      accentBorder: 'border-amber-500/40',
+      activeBg: 'bg-amber-950/40',
+      activeBorder: 'border-amber-400',
+      textColor: 'text-amber-400',
+      icon: <Zap className="w-4 h-4 text-amber-400" />,
+    },
+  ];
+
+// Mini friendly curve SVG
+const MiniCurvePreview: React.FC<{ shape: 'trapezoid' | 'staircase' | 'spike'; active: boolean }> = ({
+  shape,
+  active,
+}) => {
+  if (shape === 'trapezoid') {
+    return (
+      <svg className="w-full h-8" viewBox="0 0 100 28" fill="none">
+        <path d="M 5 24 L 20 8 L 80 8 L 95 24" stroke={active ? '#22d3ee' : '#475569'} strokeWidth="2" strokeLinecap="round" />
+        {active && <circle cx="50" cy="8" r="2.5" fill="#22d3ee" className="animate-ping" />}
+        <circle cx="50" cy="8" r="2" fill="#ffffff" />
+      </svg>
+    );
+  }
+  if (shape === 'staircase') {
+    return (
+      <svg className="w-full h-8" viewBox="0 0 100 28" fill="none">
+        <path d="M 5 24 L 20 24 L 20 18 L 40 18 L 40 12 L 60 12 L 60 6 L 80 6 L 80 2 L 95 2" stroke={active ? '#fb7185' : '#475569'} strokeWidth="2" strokeLinecap="round" />
+        {active && <circle cx="88" cy="2" r="2.5" fill="#fb7185" className="animate-ping" />}
+        <circle cx="88" cy="2" r="2" fill="#ffffff" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="w-full h-8" viewBox="0 0 100 28" fill="none">
+      <path d="M 5 24 L 35 24 L 45 4 L 55 4 L 65 24 L 95 24" stroke={active ? '#fbbf24' : '#475569'} strokeWidth="2" strokeLinecap="round" />
+      {active && <circle cx="50" cy="4" r="2.5" fill="#fbbf24" className="animate-ping" />}
+      <circle cx="50" cy="4" r="2" fill="#ffffff" />
+    </svg>
+  );
+};
 
 export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
   cluster,
@@ -164,8 +205,8 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
     const defaultUrl = wsRoute
       ? `${wsRoute.tlsEnabled ? 'wss' : 'ws'}://${wsRoute.host}`
       : firstIng
-      ? `${firstIng.tlsEnabled ? 'https' : 'http'}://${firstIng.host}`
-      : cluster.externalBaseUrl || 'https://localhost';
+        ? `${firstIng.tlsEnabled ? 'https' : 'http'}://${firstIng.host}`
+        : cluster.externalBaseUrl || 'https://localhost';
 
     setId(undefined);
     setName(`[1. Load Test] Tải Chuẩn SLA (${selectedNamespace})`);
@@ -267,115 +308,19 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
   const activeMeta = TEST_TYPE_CATALOG.find((c) => c.type === testType) || TEST_TYPE_CATALOG[0];
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-      {/* LEFT 4 COLS: SCENARIO LIST (COMPACT, FIXED SCROLL CONTAINER) */}
-      <div className="lg:col-span-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-          <div>
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-              Kịch bản ({scenarios.length})
-            </h2>
-            <p className="text-[10px] text-slate-400 font-mono truncate max-w-[140px]">
-              {selectedNamespace}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onAutoGenerateScenarios}
-              className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/20 flex items-center gap-1"
-              title="Sinh bộ 3 kịch bản: Load, Stress, Spike"
-            >
-              <Sparkles className="w-3 h-3" /> Bộ 3 Kịch bản
-            </button>
-            <button
-              type="button"
-              onClick={handleInitNewBlankScenario}
-              className="rounded-lg bg-cyan-500 px-2 py-1 text-[11px] font-bold text-slate-950 hover:bg-cyan-400 flex items-center gap-1"
-            >
-              <Plus className="w-3 h-3" /> Mới
-            </button>
-          </div>
-        </div>
-
-        {scenarios.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-800 p-5 text-center space-y-2.5">
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Chưa có kịch bản nào. Bấm nút dưới để tạo tự động bộ 3 kịch bản chuẩn!
-            </p>
-            <button
-              type="button"
-              onClick={onAutoGenerateScenarios}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/30"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> Tạo Bộ 3 Kịch bản
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-1.5 max-h-[calc(100vh-230px)] overflow-y-auto pr-1">
-            {scenarios.map((scen) => {
-              const selected = scen.id === id;
-              const sType = scen.testType || 'LOAD_TEST';
-              const meta =
-                TEST_TYPE_CATALOG.find((c) => c.type === sType) || TEST_TYPE_CATALOG[0];
-              return (
-                <div
-                  key={scen.id}
-                  onClick={() => onSelectScenario(scen.id)}
-                  className={`cursor-pointer rounded-xl border p-2.5 transition flex flex-col gap-1 ${
-                    selected
-                      ? 'border-cyan-400 bg-cyan-950/40 shadow-sm'
-                      : 'border-slate-800/80 bg-slate-950/60 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-1.5">
-                    <span className="text-xs font-semibold text-white truncate">
-                      {scen.name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteScenario(scen.id);
-                      }}
-                      className="text-slate-500 hover:text-rose-400 p-0.5 shrink-0"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className={`px-1.5 py-0.2 rounded border ${meta.activeBg}`}>
-                      {sType === 'LOAD_TEST' ? 'LOAD' : sType === 'STRESS_TEST' ? 'STRESS' : 'SPIKE'} (
-                      {scen.peakVirtualUsers && scen.peakVirtualUsers > scen.virtualUsers
-                        ? `${scen.virtualUsers}→${scen.peakVirtualUsers}`
-                        : scen.virtualUsers}{' '}
-                      VUs)
-                    </span>
-                    <span className="text-slate-400 truncate max-w-[120px]">
-                      {scen.targetPath}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* RIGHT 8 COLS: MINIMALIST SCENARIO STUDIO (ZERO SCROLL FIT) */}
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-1 gap-5 items-start">
+      {/* RIGHT 8 COLS: INTUITIVE STUDIO FORM */}
       <form
         onSubmit={handleSaveOnly}
         className="lg:col-span-8 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3.5"
       >
-        {/* COMPACT TOP ACTION BAR */}
+        {/* TOP ACTION HEADER */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Sliders className="w-4 h-4 text-cyan-400 shrink-0" />
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white">Thiết Kế Kịch Bản Kiểm Thử</h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                {protocol}
-              </span>
+            <div>
+              <h2 className="text-sm font-bold text-white">Bước 3: Thiết Kế Kịch Bản Kiểm Thử</h2>
+              <p className="text-[11px] text-slate-400">Chọn 1 trong 3 mô hình kiểm thử chuẩn và tinh chỉnh thông số</p>
             </div>
           </div>
 
@@ -403,14 +348,14 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-1.5 text-xs font-bold text-slate-950 hover:opacity-95 shadow transition"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              Chạy Kiểm Thử Thật (Bước 4)
+              Lưu & Chạy Thật (Sang Bước 4)
             </button>
           </div>
         </div>
 
-        {/* 1. THREE CORE PRESET TABS (MINIMALIST SEGMENTED CONTROL) */}
+        {/* 1. THREE DISTINCT TEST TYPE PRESET CARDS WITH CURVES */}
         <div className="space-y-1.5">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {TEST_TYPE_CATALOG.map((item) => {
               const isSelected = testType === item.type;
               return (
@@ -418,51 +363,60 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
                   key={item.type}
                   type="button"
                   onClick={() => handleSelectTestTypePreset(item.type)}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-0.5 relative ${
-                    isSelected
-                      ? `${item.accentBorder} bg-slate-950 shadow-sm ring-1 ring-cyan-500/30`
-                      : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 opacity-70 hover:opacity-100'
-                  }`}
+                  className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 relative ${isSelected
+                      ? `${item.activeBorder} ${item.activeBg} shadow-md ring-1 ring-cyan-500/30`
+                      : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 opacity-75 hover:opacity-100'
+                    }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between w-full">
                     <span className="text-xs font-bold text-white flex items-center gap-1.5">
                       {item.icon}
                       {item.title}
                     </span>
-                    <span
-                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
-                        isSelected ? item.activeBg : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
+                    <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded border ${item.accentBorder} ${item.textColor}`}>
                       {item.badgeLabel}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                    {item.subtitle}
+
+                  {/* Curve Visualizer */}
+                  <div className="bg-slate-950/80 rounded-lg p-1 border border-slate-800/80">
+                    <MiniCurvePreview shape={item.curveShape} active={isSelected} />
+                  </div>
+
+                  <p className="text-[10px] text-slate-300 leading-snug line-clamp-2">
+                    {item.purpose}
                   </p>
                 </button>
               );
             })}
           </div>
 
-          {/* COMPACT SINGLE-LINE ARCHITECTURAL FLOW BADGE */}
-          <div className="px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs text-slate-300">
-            <div className="flex items-center gap-1.5 font-mono text-[11px]">
-              <span className="text-indigo-400 font-bold">KubePulse ({virtualUsers}{showPeak ? `➔${peakVirtualUsers}` : ''} VUs)</span>
-              <ArrowRight className="w-3 h-3 text-slate-500" />
-              <span className="text-amber-400 font-bold">Ingress ({targetPath})</span>
-              <ArrowRight className="w-3 h-3 text-slate-500" />
-              <span className="text-emerald-400 font-bold">Pod ({targetWorkload || 'gateway'})</span>
-              <ArrowRight className="w-3 h-3 text-slate-500" />
-              <span className="text-sky-400 font-bold">DB / Microservices</span>
+          {/* EXPECTED WIRING FLOW PREVIEW */}
+          <div className="px-3 py-2 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+              <span className="text-indigo-400 font-bold bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-500/30">
+                1. KubePulse ({virtualUsers}{showPeak ? `➔${peakVirtualUsers}` : ''} VUs)
+              </span>
+              <ArrowRight className="w-3 h-3 text-slate-600" />
+              <span className="text-amber-400 font-bold bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30">
+                2. Ingress ({targetPath})
+              </span>
+              <ArrowRight className="w-3 h-3 text-slate-600" />
+              <span className="text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                3. Pod ({targetWorkload || 'gateway'})
+              </span>
+              <ArrowRight className="w-3 h-3 text-slate-600" />
+              <span className="text-sky-400 font-bold bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-500/30">
+                4. Database
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400 hidden sm:inline truncate max-w-[280px]">
-              {activeMeta.flowDescription}
+            <span className="text-[10px] text-slate-400 italic">
+              {activeMeta.whenToUse}
             </span>
           </div>
         </div>
 
-        {/* 2. TARGET ENDPOINT ROW (METHOD + PROTOCOL + BASE URL + PATH) */}
+        {/* 2. TARGET ENDPOINT ROW */}
         <div className="grid grid-cols-12 gap-2">
           {protocol === 'HTTP' && (
             <div className="col-span-2">
@@ -497,7 +451,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
                   );
                 }
               }}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-cyan-400 focus:outline-none font-semibold"
             >
               <option value="WEBSOCKET">WebSocket (WSS)</option>
               <option value="HTTP">HTTP / REST API</option>
@@ -505,7 +459,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
           </div>
 
           <div className={protocol === 'HTTP' ? 'col-span-4' : 'col-span-5'}>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">Host / Target URL *</label>
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">Host / Domain *</label>
             <input
               type="text"
               required
@@ -529,10 +483,10 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
           </div>
         </div>
 
-        {/* 3. COMPACT TRAFFIC & DURATION CONTROLS */}
-        <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/70 space-y-2.5">
+        {/* 3. TRAFFIC & DURATION SLIDERS */}
+        <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/70 space-y-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            {/* VUs / Base Users */}
+            {/* VUs Base */}
             <div>
               <div className="flex justify-between text-[11px] mb-1">
                 <span className="text-slate-400 font-medium">
@@ -550,7 +504,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               />
             </div>
 
-            {/* Peak VUs (for Stress / Spike) or SLA Target */}
+            {/* Peak VUs */}
             <div>
               <div className="flex justify-between text-[11px] mb-1">
                 <span className="text-slate-400 font-medium">
@@ -592,10 +546,10 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
               />
             </div>
 
-            {/* Safety Circuit Breaker */}
+            {/* Safety Breaker */}
             <div>
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-amber-400 font-medium">Cầu chì Pod:</span>
+                <span className="text-amber-400 font-medium">Cầu chì ngắt:</span>
                 <span className="font-mono font-bold text-amber-300">{safetyAbortMemoryPercent}% RAM</span>
               </div>
               <input
@@ -610,7 +564,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
           </div>
         </div>
 
-        {/* 4. COLLAPSIBLE ADVANCED CONFIG (AUTH / WORKLOAD / PAYLOAD) */}
+        {/* 4. COLLAPSIBLE ADVANCED CONFIG */}
         <div>
           <button
             type="button"
@@ -618,7 +572,7 @@ export const Step3ScenarioStudio: React.FC<Step3ScenarioStudioProps> = ({
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-200 transition"
           >
             {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            Tùy chọn Nâng cao (Authorization, Pod Target, Request Body)
+            Tùy chọn Nâng cao (Authorization JWT, Pod Target, Request Body)
           </button>
 
           {showAdvanced && (

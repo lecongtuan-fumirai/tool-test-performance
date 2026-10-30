@@ -548,6 +548,7 @@ export function App() {
           <Step4LiveMonitor
             activeRun={activeRun}
             runsHistory={runsHistory}
+            topology={topology}
             onSelectRun={(run) => setActiveRun(run)}
             onStopRun={handleStopRun}
             onRerunScenario={handleRunScenarioAndProceed}
