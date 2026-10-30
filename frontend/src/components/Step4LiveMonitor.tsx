@@ -918,11 +918,14 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
                   ĐIỂM GÃY HỆ THỐNG (BREAKING POINT):
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-500 text-white animate-pulse shadow-sm">
-                  {breakingPointVu} USERS ĐỒNG THỜI
+                  {breakingPointVu} / {currentRun.peakVirtualUsers || currentRun.virtualUsers} USERS
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  (Mục tiêu cấu hình: {currentRun.peakVirtualUsers || currentRun.virtualUsers} VUs)
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Hệ thống bắt đầu bị nghẽn tải / chặn 429 tại ngưỡng <strong className="text-white">{breakingPointVu} người dùng</strong>.
+                Hệ thống bắt đầu bị nghẽn tải / chặn 429 tại ngưỡng <strong className="text-white">{breakingPointVu} người dùng</strong> trong quá trình tăng bậc thang lên {currentRun.peakVirtualUsers || currentRun.virtualUsers} Users.
                 {safeCapacityVu && (
                   <span> Ngưỡng tải an toàn khuyến nghị (Safe Capacity): <strong className="text-emerald-400">&lt; {safeCapacityVu} Users</strong>.</span>
                 )}
@@ -939,7 +942,7 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
         <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs text-slate-300">
           <span className="flex items-center gap-2 font-mono text-cyan-300 font-bold">
             <Flame className="w-4 h-4 text-rose-400 animate-pulse" />
-            Đang tăng áp lực bậc thang dò tìm điểm gãy (Tải hiện tại: {ext?.activeWorkers || 0} Users)...
+            Đang tăng áp lực bậc thang dò tìm điểm gãy (Tải hiện tại: {ext?.activeWorkers || 0} / {currentRun.peakVirtualUsers || currentRun.virtualUsers} Users)...
           </span>
           <span className="text-slate-400 text-[11px]">Chưa phát hiện điểm gãy.</span>
         </div>
@@ -998,12 +1001,15 @@ export const Step4LiveMonitor: React.FC<Step4LiveMonitorProps> = ({
           : 'bg-slate-900/70 border-slate-800'
           }`}>
           <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span className={breakingPointVu ? 'text-rose-300 font-bold' : ''}>Điểm Gãy (Breaking Point)</span>
+            <span className={breakingPointVu ? 'text-rose-300 font-bold' : ''}>Điểm Gãy / Mục Tiêu</span>
             <Flame className={`w-3.5 h-3.5 ${breakingPointVu ? 'text-rose-400 animate-pulse' : 'text-slate-500'}`} />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className={`text-xl font-black ${breakingPointVu ? 'text-rose-400' : 'text-emerald-400'}`}>
-              {breakingPointVu ? `${breakingPointVu} VUs` : 'Chưa gãy'}
+              {breakingPointVu ? `${breakingPointVu} VUs` : `${currentRun.virtualUsers} VUs`}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              / {currentRun.peakVirtualUsers || currentRun.virtualUsers} VUs max
             </span>
           </div>
           <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80 font-mono">

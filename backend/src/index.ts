@@ -1,3 +1,6 @@
+// Optimize libuv thread pool for high-concurrency performance testing runner
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '64';
+
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
