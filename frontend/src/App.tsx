@@ -32,6 +32,35 @@ const STEP_TRANSITION_MESSAGES: Record<StudioStep, string> = {
   4: 'Đang kết nối Bảng Giám sát & Luồng Telemetry Thời gian thực...',
 };
 
+const KubePulseLogo: React.FC<{ className?: string }> = ({ className = 'w-9 h-9' }) => (
+  <svg className={className} viewBox="0 0 64 64" fill="none">
+    <defs>
+      <linearGradient id="kp-nav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#06b6d4" />
+        <stop offset="50%" stopColor="#3b82f6" />
+        <stop offset="100%" stopColor="#10b981" />
+      </linearGradient>
+      <linearGradient id="kp-nav-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#0f172a" />
+        <stop offset="100%" stopColor="#020617" />
+      </linearGradient>
+      <filter id="nav-glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#06b6d4" floodOpacity="0.8" />
+      </filter>
+    </defs>
+    <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#kp-nav-bg)" stroke="url(#kp-nav-grad)" strokeWidth="2.5" />
+    <circle cx="32" cy="14" r="3" fill="#06b6d4" filter="url(#nav-glow)" />
+    <circle cx="48" cy="23" r="2.5" fill="#3b82f6" />
+    <circle cx="48" cy="41" r="2.5" fill="#10b981" />
+    <circle cx="32" cy="50" r="3" fill="#10b981" filter="url(#nav-glow)" />
+    <circle cx="16" cy="41" r="2.5" fill="#06b6d4" />
+    <circle cx="16" cy="23" r="2.5" fill="#38bdf8" />
+    <path d="M 32 14 L 48 23 L 48 41 L 32 50 L 16 41 L 16 23 Z" stroke="#334155" strokeWidth="1.2" strokeDasharray="2 2" fill="none" />
+    <path d="M 12 32 L 22 32 L 27 20 L 32 44 L 37 25 L 42 34 L 52 32" stroke="url(#kp-nav-grad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#nav-glow)" />
+    <circle cx="37" cy="25" r="2" fill="#ffffff" />
+  </svg>
+);
+
 export function App() {
   const [currentStep, setCurrentStep] = useState<StudioStep>(1);
   const [isChangingStep, setIsChangingStep] = useState(false);
@@ -376,9 +405,7 @@ export function App() {
       <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
+            <KubePulseLogo className="w-9 h-9 shrink-0 drop-shadow" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold text-white tracking-tight">
